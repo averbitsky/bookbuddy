@@ -1,0 +1,2200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BookBuddy - School Library</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%236366f1'/%3E%3Cstop offset='100%25' style='stop-color:%238b5cf6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='6' fill='url(%23g)'/%3E%3Ctext x='16' y='23' font-size='20' text-anchor='middle'%3E📚%3C/text%3E%3C/svg%3E">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: #1a1a2e; color: #fff; overflow: hidden; }
+        #library-canvas { user-select: none; }
+        #canvas-container { width: 100vw; height: 100vh; position: relative; }
+        #library-canvas { width: 100%; height: 100%; }
+        
+        .header-overlay {
+            position: absolute; top: 0; left: 0; right: 0; padding: 12px 20px;
+            background: linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0) 100%);
+            display: flex; justify-content: space-between; align-items: center; z-index: 100; pointer-events: none;
+            transition: z-index 0s;
+        }
+        .header-overlay.dimmed { z-index: 600; }
+        .header-overlay > * { pointer-events: auto; }
+        .header-overlay .logo { transition: opacity 0.4s; }
+        .header-overlay.dimmed .logo { opacity: 0.3; }
+        .logo { display: flex; align-items: center; gap: 10px; }
+        .logo-icon { width: 36px; height: 36px; background: linear-gradient(135deg, #6366f1, #8b5cf6); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+        .logo-text { font-size: 20px; font-weight: 700; color: #4338ca; }
+        .student-selector select {
+            background: #f0f9ff; padding: 8px 12px; border-radius: 8px; font-size: 13px;
+            color: #1e40af; border: 1px solid #bfdbfe; cursor: pointer; min-width: 180px;
+            font-weight: 500;
+        }
+        .student-selector select:hover { border-color: #6366f1; }
+        .student-selector select:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2); }
+        
+        .nav-hint {
+            position: absolute; bottom: 190px; left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.75); padding: 10px 16px; border-radius: 8px;
+            font-size: 12px; color: #fff; display: flex; align-items: center; gap: 16px; z-index: 50;
+        }
+        .nav-hint span { display: flex; align-items: center; gap: 6px; }
+        .nav-hint svg { width: 16px; height: 16px; fill: currentColor; opacity: 0.8; }
+        
+        .recommendation-panel {
+            position: absolute; bottom: 0; left: 0; right: 0;
+            background: linear-gradient(0deg, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.95) 85%, transparent 100%);
+            padding: 20px; padding-top: 35px; z-index: 100;
+        }
+        .panel-title { font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: #7c3aed; margin-bottom: 12px; font-weight: 600; }
+        .book-cards { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 6px; min-height: 100px; }
+        .empty-state {
+            display: flex; align-items: center; justify-content: center;
+            width: 100%; color: #9ca3af; font-size: 14px; font-style: italic;
+            padding: 20px; text-align: center;
+        }
+        .book-card {
+            flex-shrink: 0; width: 140px; background: #fff;
+            border: 2px solid #e5e7eb; border-radius: 10px; padding: 10px;
+            cursor: pointer; transition: all 0.2s ease; position: relative;
+            display: flex; flex-direction: column; align-items: center;
+        }
+        .book-card:hover { transform: translateY(-2px); border-color: #818cf8; box-shadow: 0 6px 20px rgba(99, 102, 241, 0.15); }
+        .book-card.highlighted { border-color: #10b981; background: #f0fdf4; }
+        .book-card-cover {
+            width: 70px; height: 100px; border-radius: 4px; overflow: hidden;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            margin-bottom: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            display: flex; align-items: center; justify-content: center;
+            color: #fff; font-weight: 700; font-size: 18px;
+        }
+        .book-card-cover img { width: 100%; height: 100%; object-fit: cover; }
+        .book-genre { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #8b5cf6; margin-bottom: 4px; font-weight: 600; text-align: center; }
+        .book-title { font-size: 11px; font-weight: 600; margin-bottom: 2px; line-height: 1.3; color: #1f2937; text-align: center; max-height: 2.6em; overflow: hidden; }
+        .book-author { font-size: 9px; color: #6b7280; margin-bottom: 6px; text-align: center; }
+        .book-location { display: flex; align-items: center; gap: 4px; font-size: 10px; color: #059669; font-weight: 500; }
+        .match-score { position: absolute; top: 8px; right: 8px; background: linear-gradient(135deg, #10b981, #34d399); color: #fff; font-size: 9px; font-weight: 700; padding: 3px 6px; border-radius: 6px; }
+        
+        .book-modal {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5); backdrop-filter: blur(8px);
+            display: none; align-items: center; justify-content: center; z-index: 1000;
+        }
+        .book-modal.visible { display: flex; }
+        .modal-content {
+            background: #fff; border-radius: 14px; padding: 24px; max-width: 480px; width: 90%; position: relative;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.2); display: flex; gap: 20px;
+        }
+        .modal-cover {
+            flex-shrink: 0; width: 120px; height: 180px; border-radius: 8px; overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15); background: #f3f4f6;
+        }
+        .modal-cover img {
+            width: 100%; height: 100%; object-fit: cover;
+        }
+        .modal-cover-placeholder {
+            width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff;
+            font-size: 32px; font-weight: 700;
+        }
+        .modal-details { flex: 1; min-width: 0; }
+        .modal-close { position: absolute; top: 10px; right: 10px; background: #f3f4f6; border: none; color: #6b7280; width: 28px; height: 28px; border-radius: 50%; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .modal-close:hover { background: #e5e7eb; color: #374151; }
+        .modal-genre { font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; color: #8b5cf6; margin-bottom: 6px; font-weight: 600; }
+        .modal-title { font-size: 22px; font-weight: 700; margin-bottom: 4px; color: #111827; }
+        .modal-author { font-size: 13px; color: #6b7280; margin-bottom: 14px; }
+        .modal-pitch { font-size: 13px; line-height: 1.6; color: #374151; margin-bottom: 16px; padding: 12px; background: #f9fafb; border-radius: 8px; border-left: 3px solid #8b5cf6; }
+        .modal-location { display: flex; align-items: center; gap: 10px; padding: 12px; background: #ecfdf5; border-radius: 8px; margin-bottom: 16px; }
+        .location-icon { width: 32px; height: 32px; background: #10b981; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+        .location-text { flex: 1; }
+        .location-label { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: #059669; margin-bottom: 2px; font-weight: 600; }
+        .location-value { font-size: 14px; font-weight: 600; color: #065f46; }
+        .modal-actions { display: flex; gap: 8px; }
+        .btn { flex: 1; padding: 10px 16px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.2s; border: none; }
+        .btn-primary { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4); }
+        .btn-secondary { background: #f3f4f6; color: #374151; }
+        .btn-secondary:hover { background: #e5e7eb; }
+        
+        .hotspot-label {
+            position: absolute; pointer-events: none; transform: translate(-50%, -100%);
+            background: #4f46e5; color: #fff; padding: 6px 10px; border-radius: 6px;
+            font-size: 11px; font-weight: 600; white-space: nowrap; opacity: 0;
+            transition: opacity 0.2s; z-index: 50; box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+        }
+        .hotspot-label::after {
+            content: ''; position: absolute; bottom: -5px; left: 50%; transform: translateX(-50%);
+            border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 5px solid #4f46e5;
+        }
+        .hotspot-label.visible { opacity: 1; }
+        
+        .nav-marker {
+            position: fixed; pointer-events: none; z-index: 200;
+            width: 24px; height: 24px; transform: translate(-50%, -50%);
+        }
+        .nav-marker-ring {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            border: 2px solid #10b981; border-radius: 50%;
+            animation: navPulse 0.6s ease-out forwards;
+        }
+        .nav-marker-dot {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 6px; height: 6px; background: #10b981; border-radius: 50%;
+        }
+        @keyframes navPulse {
+            0% { transform: scale(0.5); opacity: 1; }
+            100% { transform: scale(2); opacity: 0; }
+        }
+
+        .loading-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            z-index: 2000; transition: opacity 0.4s;
+        }
+
+        .grade-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 500;
+            transition: opacity 0.4s ease;
+        }
+        .grade-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        .grade-highlight {
+            position: relative;
+            z-index: 501;
+            background: #fff;
+            border-radius: 10px;
+            padding: 4px;
+        }
+        .grade-highlight-pulse {
+            animation: gradePulse 2s ease-in-out infinite;
+        }
+        .grade-highlight select {
+            background: #fff;
+        }
+        @keyframes gradePulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4); }
+            50% { box-shadow: 0 0 0 8px rgba(99, 102, 241, 0); }
+        }
+        .grade-tooltip {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 12px;
+            background: #4f46e5;
+            color: #fff;
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 500;
+            white-space: nowrap;
+            box-shadow: 0 4px 20px rgba(79, 70, 229, 0.4);
+            z-index: 502;
+            opacity: 0;
+            transform: translateY(-10px);
+            transition: opacity 0.3s, transform 0.3s;
+        }
+        .grade-tooltip.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .grade-tooltip::before {
+            content: '';
+            position: absolute;
+            top: -6px;
+            right: 20px;
+            border-left: 6px solid transparent;
+            border-right: 6px solid transparent;
+            border-bottom: 6px solid #4f46e5;
+        }
+        .loading-overlay.hidden { opacity: 0; pointer-events: none; }
+        .loading-spinner { width: 44px; height: 44px; border: 3px solid #fbbf24; border-top-color: #b45309; border-radius: 50%; animation: spin 0.7s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-text { margin-top: 14px; color: #92400e; font-size: 14px; font-weight: 500; }
+        
+        .cursor-grab { cursor: grab; }
+        .cursor-grabbing { cursor: grabbing; }
+        .cursor-pointer { cursor: pointer; }
+
+        /* Floating action buttons */
+        .fab-container {
+            position: fixed; right: 20px; top: 50%; transform: translateY(-50%);
+            display: flex; flex-direction: column; gap: 12px; z-index: 150;
+        }
+        .fab {
+            width: 56px; height: 56px; border-radius: 50%; border: none;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 24px; cursor: pointer; transition: all 0.2s;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        .fab:hover { transform: scale(1.1); }
+        .fab-chat { background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white; }
+        .fab-camera { background: linear-gradient(135deg, #10b981, #34d399); color: white; }
+
+        /* Side panels */
+        .side-panel {
+            position: fixed; top: 0; bottom: 0; width: 380px; max-width: 90vw;
+            background: rgba(255,255,255,0.98); backdrop-filter: blur(10px);
+            box-shadow: 0 0 30px rgba(0,0,0,0.2); z-index: 500;
+            display: flex; flex-direction: column; transition: transform 0.3s ease;
+        }
+        .panel-right { right: 0; transform: translateX(100%); }
+        .panel-left { left: 0; transform: translateX(-100%); }
+        .panel-right.open, .panel-left.open { transform: translateX(0); }
+
+        .panel-header {
+            padding: 16px 20px; border-bottom: 1px solid #e5e7eb;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .panel-title { font-size: 18px; font-weight: 700; color: #111827; }
+        .panel-close {
+            width: 32px; height: 32px; border-radius: 50%; border: none;
+            background: #f3f4f6; color: #6b7280; font-size: 20px;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+        }
+        .panel-close:hover { background: #e5e7eb; }
+        .panel-body { flex: 1; overflow-y: auto; padding: 16px; }
+
+        /* Chat panel */
+        .chat-messages { display: flex; flex-direction: column; gap: 12px; min-height: 100%; }
+        .chat-bubble {
+            max-width: 85%; padding: 12px 16px; border-radius: 16px;
+            font-size: 14px; line-height: 1.5;
+        }
+        .chat-user {
+            align-self: flex-end; background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: white; border-bottom-right-radius: 4px;
+        }
+        .chat-assistant {
+            align-self: flex-start; background: #f3f4f6; color: #1f2937;
+            border-bottom-left-radius: 4px;
+        }
+        .chat-assistant p { margin: 0 0 8px 0; }
+        .chat-assistant p:last-child { margin-bottom: 0; }
+        .chat-assistant strong { color: #4f46e5; }
+        .chat-assistant code { background: #e5e7eb; padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+        .chat-input-container {
+            padding: 16px; border-top: 1px solid #e5e7eb;
+            display: flex; gap: 8px;
+        }
+        .chat-input {
+            flex: 1; padding: 12px 16px; border: 1px solid #d1d5db;
+            border-radius: 24px; font-size: 14px; outline: none;
+        }
+        .chat-input:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+        .chat-send {
+            width: 44px; height: 44px; border-radius: 50%; border: none;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6); color: white;
+            font-size: 18px; cursor: pointer;
+        }
+        .chat-send:hover { opacity: 0.9; }
+        .chat-send:disabled { opacity: 0.5; cursor: not-allowed; }
+        .tool-status {
+            display: inline-flex; align-items: center; gap: 8px;
+            color: #6366f1; font-style: italic;
+        }
+        .tool-status::before {
+            content: ''; width: 8px; height: 8px; background: #6366f1;
+            border-radius: 50%; animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.8); }
+        }
+
+        /* Visual search panel */
+        .upload-zone {
+            border: 2px dashed #d1d5db; border-radius: 12px; padding: 40px 20px;
+            text-align: center; cursor: pointer; transition: all 0.2s;
+        }
+        .upload-zone:hover { border-color: #10b981; background: #f0fdf4; }
+        .upload-zone.dragover { border-color: #10b981; background: #dcfce7; }
+        .upload-icon { font-size: 48px; margin-bottom: 12px; }
+        .upload-text { color: #6b7280; font-size: 14px; }
+        .upload-preview { margin-top: 20px; text-align: center; }
+        .upload-preview img { max-width: 100%; max-height: 200px; border-radius: 8px; }
+        .analysis-result {
+            margin-top: 20px; padding: 16px; background: #f9fafb;
+            border-radius: 12px; border-left: 4px solid #10b981;
+        }
+        .analysis-title { font-weight: 600; color: #111827; margin-bottom: 4px; }
+        .analysis-author { color: #6b7280; font-size: 14px; margin-bottom: 12px; }
+        .analysis-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+        .analysis-tag {
+            background: #e0f2fe; color: #0369a1; font-size: 12px;
+            padding: 4px 10px; border-radius: 12px;
+        }
+        .similar-books-list { margin-top: 20px; }
+        .similar-book-item {
+            padding: 12px; background: white; border: 1px solid #e5e7eb;
+            border-radius: 8px; margin-bottom: 8px; cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .similar-book-item:hover {
+            border-color: #10b981;
+            background: #f0fdf4;
+            transform: translateX(4px);
+        }
+        .similar-book-title { font-weight: 600; color: #111827; font-size: 14px; }
+        .similar-book-author { color: #6b7280; font-size: 12px; }
+
+        /* Reading List */
+        .reading-list-btn {
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: white; border: none; padding: 8px 16px; border-radius: 8px;
+            font-size: 13px; font-weight: 600; cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .reading-list-btn:hover { transform: scale(1.05); box-shadow: 0 4px 12px rgba(99,102,241,0.3); }
+        .reading-list-panel {
+            position: absolute; top: 60px; right: 20px; width: 320px;
+            background: white; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+            z-index: 200; display: none; max-height: 400px; overflow: hidden;
+        }
+        .reading-list-panel.visible { display: block; }
+        .reading-list-header {
+            padding: 16px 20px; border-bottom: 1px solid #e5e7eb;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .reading-list-header h3 { margin: 0; font-size: 16px; color: #111827; }
+        .reading-list-close { background: none; border: none; font-size: 20px; cursor: pointer; color: #9ca3af; }
+        .reading-list-close:hover { color: #111827; }
+        .reading-list-content { padding: 12px; max-height: 320px; overflow-y: auto; }
+        .reading-list-item {
+            padding: 12px; background: #f9fafb; border-radius: 8px; margin-bottom: 8px;
+            cursor: pointer; position: relative; transition: background 0.2s;
+        }
+        .reading-list-item:hover { background: #f0fdf4; }
+        .reading-list-title { font-weight: 600; color: #111827; font-size: 14px; padding-right: 24px; }
+        .reading-list-author { color: #6b7280; font-size: 12px; }
+        .reading-list-remove {
+            position: absolute; top: 8px; right: 8px; background: none; border: none;
+            color: #9ca3af; cursor: pointer; font-size: 14px; padding: 4px;
+        }
+        .reading-list-remove:hover { color: #ef4444; }
+    </style>
+</head>
+<body>
+    <div class="loading-overlay" id="loading">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Welcome to the Library!</div>
+    </div>
+    
+    <div id="canvas-container">
+        <canvas id="library-canvas" class="cursor-grab"></canvas>
+
+        <!-- Grade selection overlay - dims everything until grade is selected -->
+        <div class="grade-overlay" id="gradeOverlay"></div>
+
+        <div class="header-overlay dimmed" id="headerOverlay">
+            <div class="logo"><div class="logo-icon">📚</div><span class="logo-text">BookBuddy</span></div>
+            <div style="display:flex;align-items:center;gap:12px;">
+                <button id="readingListBtn" class="reading-list-btn" onclick="toggleReadingList()" style="display:none;">📚 My List (0)</button>
+                <div class="student-selector grade-highlight" id="gradeSelectorWrapper">
+                    <select id="gradeSelect" class="grade-highlight-pulse" onchange="selectGrade(this.value)">
+                        <option value="">Select your grade...</option>
+                        <option value="K">Kindergarten</option>
+                        <option value="1">Grade 1</option>
+                        <option value="2">Grade 2</option>
+                        <option value="3">Grade 3</option>
+                        <option value="4">Grade 4</option>
+                        <option value="5">Grade 5</option>
+                        <option value="6">Grade 6</option>
+                        <option value="7">Grade 7</option>
+                        <option value="8">Grade 8</option>
+                        <option value="9">Grade 9</option>
+                        <option value="10">Grade 10</option>
+                        <option value="11">Grade 11</option>
+                        <option value="12">Grade 12</option>
+                    </select>
+                    <div class="grade-tooltip" id="gradeTooltip">👋 Start by selecting your grade!</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reading List Panel -->
+        <div class="reading-list-panel" id="readingListPanel">
+            <div class="reading-list-header">
+                <h3>📖 My Reading List</h3>
+                <button class="reading-list-close" onclick="toggleReadingList()">×</button>
+            </div>
+            <div class="reading-list-content" id="readingListBooks">
+                <p style="color:#6b7280;text-align:center;padding:20px;">No books added yet</p>
+            </div>
+        </div>
+
+        <div class="nav-hint">
+            <span><svg viewBox="0 0 24 24"><path d="M15 15H3v2h12v-2zm0-8H3v2h12V7zM3 13h18v-2H3v2zm0 8h18v-2H3v2zM3 3v2h18V3H3z"/></svg>Drag to look</span>
+            <span><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z"/></svg>Click to walk</span>
+            <span><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>Scroll to zoom</span>
+        </div>
+        
+        <div class="recommendation-panel" id="recommendationPanel">
+            <div class="panel-title">Your Recommendations</div>
+            <div class="book-cards" id="bookCards">
+                <div class="empty-state" id="emptyState">
+                    Chat with the librarian or scan a book cover to get personalized recommendations
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="book-modal" id="bookModal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeModal()">×</button>
+            <div class="modal-cover" id="modalCover">
+                <div class="modal-cover-placeholder" id="modalCoverPlaceholder">HP</div>
+            </div>
+            <div class="modal-details">
+                <div class="modal-genre" id="modalGenre">Fantasy</div>
+                <div class="modal-title" id="modalTitle">Book Title</div>
+                <div class="modal-author" id="modalAuthor">by Author</div>
+                <div class="modal-pitch" id="modalPitch">Book pitch here...</div>
+                <div class="modal-location">
+                    <div class="location-icon">📍</div>
+                    <div class="location-text">
+                        <div class="location-label">Find it at</div>
+                        <div class="location-value" id="modalLocation">Section A, Shelf 2</div>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button class="btn btn-secondary" onclick="closeModal()">Keep Browsing</button>
+                    <button class="btn btn-primary" onclick="addToList()">Add to My List</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="hotspotLabels"></div>
+
+    <!-- Floating Action Buttons -->
+    <div class="fab-container">
+        <button class="fab fab-chat" onclick="toggleChatPanel()" title="Chat with Librarian">💬</button>
+        <button class="fab fab-camera" onclick="toggleVisualPanel()" title="Scan Book Cover">📷</button>
+    </div>
+
+    <!-- Chat Panel -->
+    <div class="side-panel panel-right" id="chatPanel">
+        <div class="panel-header">
+            <span class="panel-title">Chat with Librarian</span>
+            <button class="panel-close" onclick="toggleChatPanel()">×</button>
+        </div>
+        <div class="panel-body">
+            <div class="chat-messages" id="chatMessages">
+                <div class="chat-bubble chat-assistant">
+                    Hi! I'm your BookBuddy librarian. What kind of books are you looking for today?
+                </div>
+            </div>
+        </div>
+        <div class="chat-input-container">
+            <input type="text" class="chat-input" id="chatInput" placeholder="Ask for recommendations..." onkeypress="handleChatKeypress(event)">
+            <button class="chat-send" id="chatSendBtn" onclick="sendChatMessage()">→</button>
+        </div>
+    </div>
+
+    <!-- Visual Search Panel -->
+    <div class="side-panel panel-left" id="visualPanel">
+        <div class="panel-header">
+            <span class="panel-title">Scan Book Cover</span>
+            <button class="panel-close" onclick="toggleVisualPanel()">×</button>
+        </div>
+        <div class="panel-body">
+            <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+                <div class="upload-icon">📚</div>
+                <div class="upload-text">Click or drag a book cover image here</div>
+            </div>
+            <input type="file" id="fileInput" accept="image/*" style="display:none" onchange="handleFileSelect(event)">
+            <div class="upload-preview" id="uploadPreview"></div>
+            <div id="analysisResult"></div>
+            <div class="similar-books-list" id="similarBooksList"></div>
+        </div>
+    </div>
+
+    <script>
+        // Dynamic data - loaded from API
+        let recommendations = [];
+        let students = [];
+        let currentStudentId = null;
+        let readingList = [];  // User's selected books for this session
+        let currentModalBook = null;  // Track which book is shown in modal
+
+        let scene, camera, renderer, hotspots = [], raycaster, mouse;
+        let isDragging = false, dragStart = { x: 0, y: 0 };
+        let cameraTarget = new THREE.Vector3(0, 1.6, 4);  // Eye level, standing in library
+        let cameraDistance = 0.1, cameraTheta = 0, cameraPhi = Math.PI / 2;  // First-person view
+        let targetDistance = 0.1, targetTheta = 0, targetPhi = Math.PI / 2;
+        let walkTarget = null, isWalking = false;
+        const walkSpeed = 0.35;
+        const roomBounds = { minX: -8.5, maxX: 8.5, minZ: -7.5, maxZ: 7.5 };
+        let floorMesh;
+        let clickStartTime = 0, clickStartPos = { x: 0, y: 0 };
+        
+        // Procedural textures
+        function createFloorTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512; canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            
+            // Warm tan/brown linoleum tiles
+            const tileSize = 64;
+            for (let y = 0; y < 512; y += tileSize) {
+                for (let x = 0; x < 512; x += tileSize) {
+                    // Alternating warm tones
+                    const isAlt = ((x / tileSize) + (y / tileSize)) % 2 === 0;
+                    const baseR = isAlt ? 185 : 175;
+                    const baseG = isAlt ? 155 : 145;
+                    const baseB = isAlt ? 115 : 105;
+                    const variation = Math.random() * 10 - 5;
+                    
+                    ctx.fillStyle = `rgb(${baseR + variation}, ${baseG + variation}, ${baseB + variation})`;
+                    ctx.fillRect(x, y, tileSize, tileSize);
+                    
+                    // Speckles for texture
+                    for (let i = 0; i < 50; i++) {
+                        const speckleShade = Math.random() > 0.5 ? 20 : -20;
+                        ctx.fillStyle = `rgba(${baseR + speckleShade}, ${baseG + speckleShade}, ${baseB + speckleShade}, 0.4)`;
+                        ctx.fillRect(x + Math.random() * tileSize, y + Math.random() * tileSize, 2, 2);
+                    }
+                }
+            }
+            
+            // Dark grout lines
+            ctx.strokeStyle = '#6b5a48';
+            ctx.lineWidth = 2;
+            for (let i = 0; i <= 512; i += tileSize) {
+                ctx.beginPath();
+                ctx.moveTo(i, 0); ctx.lineTo(i, 512);
+                ctx.moveTo(0, i); ctx.lineTo(512, i);
+                ctx.stroke();
+            }
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+            texture.repeat.set(5, 5);
+            return texture;
+        }
+        
+        function createWallTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512; canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            
+            // Warm beige/tan base - NOT white
+            ctx.fillStyle = '#d4c4a8';
+            ctx.fillRect(0, 0, 512, 512);
+            
+            // Subtle texture variation
+            for (let i = 0; i < 8000; i++) {
+                const shade = Math.random() > 0.5 ? 10 : -10;
+                ctx.fillStyle = `rgba(${200 + shade}, ${185 + shade}, ${160 + shade}, 0.15)`;
+                ctx.fillRect(Math.random() * 512, Math.random() * 512, 2 + Math.random() * 3, 2 + Math.random() * 3);
+            }
+            
+            // Horizontal lines suggesting cinderblock
+            ctx.strokeStyle = 'rgba(150, 135, 115, 0.2)';
+            ctx.lineWidth = 1;
+            for (let y = 32; y < 512; y += 32) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(512, y);
+                ctx.stroke();
+            }
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+            texture.repeat.set(3, 2);
+            return texture;
+        }
+        
+        function createCeilingTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512; canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            
+            // Off-white/cream ceiling tiles
+            ctx.fillStyle = '#e8e0d0';
+            ctx.fillRect(0, 0, 512, 512);
+            
+            // Tile grid
+            const tileSize = 128;
+            ctx.strokeStyle = '#c0b8a8';
+            ctx.lineWidth = 3;
+            for (let i = 0; i <= 512; i += tileSize) {
+                ctx.beginPath();
+                ctx.moveTo(i, 0); ctx.lineTo(i, 512);
+                ctx.moveTo(0, i); ctx.lineTo(512, i);
+                ctx.stroke();
+            }
+            
+            // Acoustic texture dots
+            ctx.fillStyle = '#d8d0c0';
+            for (let ty = 0; ty < 4; ty++) {
+                for (let tx = 0; tx < 4; tx++) {
+                    for (let i = 0; i < 80; i++) {
+                        ctx.beginPath();
+                        ctx.arc(
+                            tx * tileSize + 15 + Math.random() * (tileSize - 30),
+                            ty * tileSize + 15 + Math.random() * (tileSize - 30),
+                            1, 0, Math.PI * 2
+                        );
+                        ctx.fill();
+                    }
+                }
+            }
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+            texture.repeat.set(4, 4);
+            return texture;
+        }
+        
+        function createWoodTexture(baseHex, darkHex) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256; canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            
+            // Parse hex colors
+            const base = parseInt(baseHex.slice(1), 16);
+            const baseR = (base >> 16) & 255, baseG = (base >> 8) & 255, baseB = base & 255;
+            const dark = parseInt(darkHex.slice(1), 16);
+            const darkR = (dark >> 16) & 255, darkG = (dark >> 8) & 255, darkB = dark & 255;
+            
+            ctx.fillStyle = baseHex;
+            ctx.fillRect(0, 0, 256, 256);
+            
+            // Wood grain lines
+            for (let i = 0; i < 40; i++) {
+                const y = Math.random() * 256;
+                const alpha = 0.15 + Math.random() * 0.2;
+                ctx.strokeStyle = `rgba(${darkR}, ${darkG}, ${darkB}, ${alpha})`;
+                ctx.lineWidth = 0.5 + Math.random() * 2.5;
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                let currentY = y;
+                for (let x = 0; x < 256; x += 6) {
+                    currentY += Math.sin(x * 0.02 + i) * 1.5 + (Math.random() - 0.5) * 1;
+                    ctx.lineTo(x, currentY);
+                }
+                ctx.stroke();
+            }
+            
+            // Knots
+            for (let k = 0; k < 2; k++) {
+                const kx = Math.random() * 256, ky = Math.random() * 256;
+                for (let r = 12; r > 0; r -= 2) {
+                    ctx.beginPath();
+                    ctx.ellipse(kx, ky, r, r * 0.7, Math.random() * 0.5, 0, Math.PI * 2);
+                    ctx.strokeStyle = `rgba(${darkR - 20}, ${darkG - 20}, ${darkB - 10}, 0.25)`;
+                    ctx.stroke();
+                }
+            }
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+            return texture;
+        }
+        
+        function createCarpetTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 128; canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            
+            // Rich blue carpet
+            ctx.fillStyle = '#1e40af';
+            ctx.fillRect(0, 0, 128, 128);
+            
+            // Carpet fiber texture
+            for (let i = 0; i < 3000; i++) {
+                const shade = Math.random() > 0.5 ? '#1e3a8a' : '#2563eb';
+                ctx.fillStyle = shade;
+                ctx.fillRect(Math.random() * 128, Math.random() * 128, 1, 2 + Math.random());
+            }
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+            texture.repeat.set(3, 2);
+            return texture;
+        }
+        
+        // API Functions
+        let currentGrade = null;
+
+        async function selectGrade(grade) {
+            if (!grade) return;
+            currentGrade = grade;
+            currentStudentId = `grade-${grade}`; // Virtual student ID for chat/visual search
+
+            // Hide the grade selection overlay and restore normal UI
+            const overlay = document.getElementById('gradeOverlay');
+            const tooltip = document.getElementById('gradeTooltip');
+            const selector = document.getElementById('gradeSelect');
+            const wrapper = document.getElementById('gradeSelectorWrapper');
+            const header = document.getElementById('headerOverlay');
+
+            if (overlay) overlay.classList.add('hidden');
+            if (tooltip) tooltip.classList.remove('visible');
+            if (selector) selector.classList.remove('grade-highlight-pulse');
+            if (wrapper) wrapper.classList.remove('grade-highlight');
+            if (header) header.classList.remove('dimmed');
+
+            // Don't load recommendations yet - wait for user to chat or scan a book
+        }
+
+        function refreshHotspots() {
+            // Remove existing hotspots
+            hotspots.forEach(h => {
+                if (h.userData.glow) scene.remove(h.userData.glow);
+                scene.remove(h);
+            });
+            hotspots = [];
+            document.getElementById('hotspotLabels').innerHTML = '';
+            // Recreate hotspots with new recommendations
+            createHotspots();
+        }
+
+        function init() {
+            scene = new THREE.Scene();
+            // Warm ambient background color - NOT white
+            scene.background = new THREE.Color(0xb8a890);
+            
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+            updateCameraPosition();
+            
+            const canvas = document.getElementById('library-canvas');
+            renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.0;
+            renderer.outputEncoding = THREE.sRGBEncoding;
+            
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+            
+            createRoom();
+            createBookshelves();
+            createFurniture();
+            createCheckoutDesk();
+            createDecorations();
+            createLighting();
+
+            canvas.addEventListener('mousedown', onMouseDown);
+            canvas.addEventListener('mousemove', onMouseMove);
+            canvas.addEventListener('mouseup', onMouseUp);
+            canvas.addEventListener('mouseleave', onMouseUp);
+            canvas.addEventListener('wheel', onWheel, { passive: false });
+            canvas.addEventListener('contextmenu', e => e.preventDefault());
+            canvas.addEventListener('touchstart', onTouchStart, { passive: false });
+            canvas.addEventListener('touchmove', onTouchMove, { passive: false });
+            canvas.addEventListener('touchend', onTouchEnd);
+            window.addEventListener('resize', onResize);
+            
+            // Start with empty recommendations - user selects grade to get them
+            populateCards();
+            setTimeout(() => {
+                document.getElementById('loading').classList.add('hidden');
+                // Show grade tooltip after loading screen fades
+                setTimeout(() => {
+                    const tooltip = document.getElementById('gradeTooltip');
+                    if (tooltip && !currentGrade) {
+                        tooltip.classList.add('visible');
+                    }
+                }, 400);
+            }, 1200);
+            animate();
+        }
+        
+        function updateCameraPosition() {
+            const x = cameraTarget.x + cameraDistance * Math.sin(cameraPhi) * Math.sin(cameraTheta);
+            const y = cameraTarget.y + cameraDistance * Math.cos(cameraPhi);
+            const z = cameraTarget.z + cameraDistance * Math.sin(cameraPhi) * Math.cos(cameraTheta);
+            camera.position.set(x, y, z);
+            camera.lookAt(cameraTarget);
+        }
+        
+        function createRoom() {
+            const roomW = 20, roomD = 18, roomH = 3.5;
+            
+            // Floor with warm tan tiles
+            const floorTex = createFloorTexture();
+            const floorMat = new THREE.MeshStandardMaterial({ 
+                map: floorTex, roughness: 0.6, metalness: 0.05
+            });
+            floorMesh = new THREE.Mesh(new THREE.PlaneGeometry(roomW, roomD), floorMat);
+            floorMesh.rotation.x = -Math.PI / 2;
+            floorMesh.receiveShadow = true;
+            floorMesh.name = 'floor';
+            scene.add(floorMesh);
+            
+            // Blue reading carpet
+            const carpetTex = createCarpetTexture();
+            const carpetMat = new THREE.MeshStandardMaterial({ map: carpetTex, roughness: 0.95 });
+            const carpet = new THREE.Mesh(new THREE.PlaneGeometry(5, 4), carpetMat);
+            carpet.rotation.x = -Math.PI / 2;
+            carpet.position.set(5, 0.01, 4);
+            scene.add(carpet);
+            
+            // Walls - warm beige/tan, NOT white
+            const wallTex = createWallTexture();
+            const wallMat = new THREE.MeshStandardMaterial({ 
+                map: wallTex, roughness: 0.85, side: THREE.DoubleSide 
+            });
+            
+            const backWall = new THREE.Mesh(new THREE.PlaneGeometry(roomW, roomH), wallMat);
+            backWall.position.set(0, roomH / 2, -roomD / 2);
+            backWall.receiveShadow = true;
+            scene.add(backWall);
+            
+            const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(roomD, roomH), wallMat);
+            leftWall.position.set(-roomW / 2, roomH / 2, 0);
+            leftWall.rotation.y = Math.PI / 2;
+            scene.add(leftWall);
+            
+            const rightWall = new THREE.Mesh(new THREE.PlaneGeometry(roomD, roomH), wallMat);
+            rightWall.position.set(roomW / 2, roomH / 2, 0);
+            rightWall.rotation.y = -Math.PI / 2;
+            scene.add(rightWall);
+            
+            const frontWallL = new THREE.Mesh(new THREE.PlaneGeometry(7, roomH), wallMat);
+            frontWallL.position.set(-6.5, roomH / 2, roomD / 2);
+            frontWallL.rotation.y = Math.PI;
+            scene.add(frontWallL);
+            
+            const frontWallR = new THREE.Mesh(new THREE.PlaneGeometry(7, roomH), wallMat);
+            frontWallR.position.set(6.5, roomH / 2, roomD / 2);
+            frontWallR.rotation.y = Math.PI;
+            scene.add(frontWallR);
+            
+            // Ceiling - cream colored acoustic tiles
+            const ceilingTex = createCeilingTexture();
+            const ceilingMat = new THREE.MeshStandardMaterial({ map: ceilingTex, roughness: 0.9 });
+            const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(roomW, roomD), ceilingMat);
+            ceiling.rotation.x = Math.PI / 2;
+            ceiling.position.y = roomH;
+            scene.add(ceiling);
+            
+            // Dark wood baseboard trim
+            const baseboardMat = new THREE.MeshStandardMaterial({ color: 0x4a3728, roughness: 0.5 });
+            
+            const backBaseboard = new THREE.Mesh(new THREE.BoxGeometry(roomW, 0.15, 0.04), baseboardMat);
+            backBaseboard.position.set(0, 0.075, -roomD / 2 + 0.02);
+            scene.add(backBaseboard);
+            
+            const leftBaseboard = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.15, roomD), baseboardMat);
+            leftBaseboard.position.set(-roomW / 2 + 0.02, 0.075, 0);
+            scene.add(leftBaseboard);
+            
+            const rightBaseboard = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.15, roomD), baseboardMat);
+            rightBaseboard.position.set(roomW / 2 - 0.02, 0.075, 0);
+            scene.add(rightBaseboard);
+            
+            createWindows();
+            createWallAccents();
+        }
+        
+        function createWindows() {
+            // Brown wood window frames
+            const frameMat = new THREE.MeshStandardMaterial({ color: 0x6b4423, roughness: 0.5 });
+            // Cream window sill
+            const sillMat = new THREE.MeshStandardMaterial({ color: 0xe8dcc8, roughness: 0.5 });
+            
+            // Create outdoor scene texture
+            const createOutdoorTexture = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = 256; canvas.height = 256;
+                const ctx = canvas.getContext('2d');
+                
+                // Blue sky gradient
+                const skyGradient = ctx.createLinearGradient(0, 0, 0, 150);
+                skyGradient.addColorStop(0, '#87CEEB');
+                skyGradient.addColorStop(0.5, '#B0E0E6');
+                skyGradient.addColorStop(1, '#E0F4FF');
+                ctx.fillStyle = skyGradient;
+                ctx.fillRect(0, 0, 256, 150);
+                
+                // A few white clouds
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+                ctx.beginPath();
+                ctx.ellipse(60, 40, 30, 15, 0, 0, Math.PI * 2);
+                ctx.ellipse(85, 35, 25, 12, 0, 0, Math.PI * 2);
+                ctx.ellipse(45, 45, 20, 10, 0, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.beginPath();
+                ctx.ellipse(180, 60, 25, 12, 0, 0, Math.PI * 2);
+                ctx.ellipse(200, 55, 20, 10, 0, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Grass/ground
+                const grassGradient = ctx.createLinearGradient(0, 150, 0, 256);
+                grassGradient.addColorStop(0, '#7CCD7C');
+                grassGradient.addColorStop(1, '#4A8B4A');
+                ctx.fillStyle = grassGradient;
+                ctx.fillRect(0, 150, 256, 106);
+                
+                // Trees - dark green foliage
+                const drawTree = (x, y, size) => {
+                    // Trunk
+                    ctx.fillStyle = '#5D4037';
+                    ctx.fillRect(x - size * 0.1, y, size * 0.2, size * 0.4);
+                    
+                    // Foliage layers
+                    ctx.fillStyle = '#2E7D32';
+                    ctx.beginPath();
+                    ctx.ellipse(x, y - size * 0.1, size * 0.5, size * 0.4, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.fillStyle = '#388E3C';
+                    ctx.beginPath();
+                    ctx.ellipse(x - size * 0.2, y, size * 0.35, size * 0.3, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.fillStyle = '#43A047';
+                    ctx.beginPath();
+                    ctx.ellipse(x + size * 0.15, y - size * 0.05, size * 0.3, size * 0.25, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                };
+                
+                // Draw several trees at different positions
+                drawTree(40, 140, 50);
+                drawTree(100, 145, 40);
+                drawTree(160, 138, 55);
+                drawTree(220, 142, 45);
+                drawTree(70, 150, 35);
+                drawTree(190, 148, 38);
+                
+                return new THREE.CanvasTexture(canvas);
+            };
+            
+            const outdoorTex = createOutdoorTexture();
+            const outdoorMat = new THREE.MeshBasicMaterial({ map: outdoorTex });
+            
+            for (let i = 0; i < 3; i++) {
+                const wz = -5 + i * 5;
+                
+                // Outdoor scene behind window
+                const outdoor = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.8), outdoorMat);
+                outdoor.position.set(-9.99, 2.0, wz);
+                outdoor.rotation.y = Math.PI / 2;
+                scene.add(outdoor);
+                
+                // Window frame pieces
+                const frameTop = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 1.7), frameMat);
+                frameTop.position.set(-9.94, 2.9, wz);
+                scene.add(frameTop);
+                const frameBottom = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 1.7), frameMat);
+                frameBottom.position.set(-9.94, 1.1, wz);
+                scene.add(frameBottom);
+                const frameL = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.8, 0.1), frameMat);
+                frameL.position.set(-9.94, 2.0, wz - 0.8);
+                scene.add(frameL);
+                const frameR = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.8, 0.1), frameMat);
+                frameR.position.set(-9.94, 2.0, wz + 0.8);
+                scene.add(frameR);
+                
+                // Cross mullions
+                const mullionV = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.8, 0.04), frameMat);
+                mullionV.position.set(-9.94, 2.0, wz);
+                scene.add(mullionV);
+                
+                const mullionH = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.04, 1.6), frameMat);
+                mullionH.position.set(-9.94, 2.0, wz);
+                scene.add(mullionH);
+                
+                // Window sill
+                const sill = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.05, 1.8), sillMat);
+                sill.position.set(-9.86, 1.0, wz);
+                sill.castShadow = true;
+                scene.add(sill);
+            }
+        }
+        
+        function createWallAccents() {
+            // Colorful section banners on back wall
+            const colors = [0xb91c1c, 0xc2410c, 0x15803d, 0x1d4ed8, 0x7e22ce];
+            
+            for (let i = 0; i < 5; i++) {
+                const sign = new THREE.Mesh(
+                    new THREE.BoxGeometry(2.8, 0.45, 0.04),
+                    new THREE.MeshStandardMaterial({ color: colors[i], roughness: 0.4 })
+                );
+                sign.position.set(-8 + i * 4, 3.0, -8.96);
+                sign.castShadow = true;
+                scene.add(sign);
+            }
+            
+            // Cork bulletin board on right wall
+            const corkMat = new THREE.MeshStandardMaterial({ color: 0xc4956a, roughness: 0.95 });
+            const corkBoard = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.2, 2.2), corkMat);
+            corkBoard.position.set(9.96, 2.2, 3);
+            scene.add(corkBoard);
+            
+            // Board frame - dark brown
+            const boardFrameMat = new THREE.MeshStandardMaterial({ color: 0x4a3728, roughness: 0.5 });
+            const frameThickness = 0.08;
+            
+            const frameTop = new THREE.Mesh(new THREE.BoxGeometry(0.08, frameThickness, 2.35), boardFrameMat);
+            frameTop.position.set(9.96, 2.8, 3);
+            scene.add(frameTop);
+            const frameBottom = frameTop.clone();
+            frameBottom.position.y = 1.6;
+            scene.add(frameBottom);
+            const frameLeft = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.2, frameThickness), boardFrameMat);
+            frameLeft.position.set(9.96, 2.2, 1.9);
+            scene.add(frameLeft);
+            const frameRight = frameLeft.clone();
+            frameRight.position.z = 4.1;
+            scene.add(frameRight);
+            
+            // Clock on right wall
+            const clockFace = new THREE.Mesh(
+                new THREE.CircleGeometry(0.22, 32),
+                new THREE.MeshStandardMaterial({ color: 0xfaf8f5, roughness: 0.3 })
+            );
+            clockFace.position.set(9.96, 2.8, -3);
+            clockFace.rotation.y = -Math.PI / 2;
+            scene.add(clockFace);
+            
+            const clockRim = new THREE.Mesh(
+                new THREE.RingGeometry(0.21, 0.26, 32),
+                new THREE.MeshStandardMaterial({ color: 0x2d2d2d, roughness: 0.3, metalness: 0.4 })
+            );
+            clockRim.position.set(9.97, 2.8, -3);
+            clockRim.rotation.y = -Math.PI / 2;
+            scene.add(clockRim);
+            
+            // Clock hands
+            const handMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a });
+            const hourHand = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.1, 0.01), handMat);
+            hourHand.position.set(9.95, 2.85, -3);
+            hourHand.rotation.y = -Math.PI / 2;
+            scene.add(hourHand);
+            const minuteHand = new THREE.Mesh(new THREE.BoxGeometry(0.015, 0.14, 0.01), handMat);
+            minuteHand.position.set(9.95, 2.8, -2.93);
+            minuteHand.rotation.y = -Math.PI / 2;
+            minuteHand.rotation.z = Math.PI / 3;
+            scene.add(minuteHand);
+        }
+        
+        function createBookshelves() {
+            // Honey oak texture for main shelves
+            const oakTex = createWoodTexture('#c9a66b', '#8b6914');
+            
+            // Back wall shelves
+            for (let i = 0; i < 5; i++) {
+                const shelf = createBookshelf(3.2, 2.2, oakTex);
+                shelf.position.set(-6.4 + i * 3.2, 0, -8);
+                scene.add(shelf);
+            }
+            
+            // Left wall shelves
+            for (let i = 0; i < 2; i++) {
+                const shelf = createBookshelf(3, 2.2, oakTex);
+                shelf.position.set(-9, 0, -3 + i * 5);
+                shelf.rotation.y = Math.PI / 2;
+                scene.add(shelf);
+            }
+            
+            // Darker walnut for center islands
+            const walnutTex = createWoodTexture('#7a5c3e', '#4a3520');
+            for (let i = 0; i < 2; i++) {
+                const shelf = createIslandShelf(4, 1.4, walnutTex);
+                shelf.position.set(-3 + i * 6, 0, 0);
+                scene.add(shelf);
+            }
+        }
+        
+        function createBookshelf(width, height, woodTex) {
+            const group = new THREE.Group();
+            const woodMat = new THREE.MeshStandardMaterial({ map: woodTex.clone(), roughness: 0.55 });
+            const depth = 0.32;
+            
+            // Sides
+            const leftSide = new THREE.Mesh(new THREE.BoxGeometry(depth, height, 0.025), woodMat);
+            leftSide.position.set(0, height / 2, -width / 2 + 0.012);
+            leftSide.castShadow = true;
+            leftSide.receiveShadow = true;
+            group.add(leftSide);
+            
+            const rightSide = leftSide.clone();
+            rightSide.position.z = width / 2 - 0.012;
+            group.add(rightSide);
+            
+            // Back - lighter panel
+            const backMat = new THREE.MeshStandardMaterial({ color: 0xd4c4a0, roughness: 0.8 });
+            const back = new THREE.Mesh(new THREE.BoxGeometry(0.012, height, width), backMat);
+            back.position.set(-depth / 2 + 0.006, height / 2, 0);
+            group.add(back);
+            
+            // Top
+            const top = new THREE.Mesh(new THREE.BoxGeometry(depth + 0.02, 0.025, width + 0.02), woodMat);
+            top.position.set(0.01, height, 0);
+            top.castShadow = true;
+            group.add(top);
+            
+            // Bottom
+            const bottom = new THREE.Mesh(new THREE.BoxGeometry(depth, 0.08, width), woodMat);
+            bottom.position.set(0, 0.04, 0);
+            group.add(bottom);
+            
+            // Shelves with books on BOTH sides
+            const shelfCount = 4;
+            for (let i = 0; i < shelfCount; i++) {
+                const shelfY = 0.12 + i * (height - 0.2) / shelfCount;
+                const shelf = new THREE.Mesh(new THREE.BoxGeometry(depth - 0.015, 0.022, width - 0.03), woodMat);
+                shelf.position.set(0, shelfY, 0);
+                shelf.receiveShadow = true;
+                group.add(shelf);
+                
+                // Books on front side
+                addColorfulBooks(group, shelfY + 0.015, width - 0.08, depth / 2 - 0.03, depth / 4);
+                // Books on back side
+                addColorfulBooks(group, shelfY + 0.015, width - 0.08, depth / 2 - 0.03, -depth / 4, true);
+            }
+            
+            return group;
+        }
+        
+        function createIslandShelf(width, height, woodTex) {
+            const group = new THREE.Group();
+            const woodMat = new THREE.MeshStandardMaterial({ map: woodTex.clone(), roughness: 0.5 });
+            const depth = 0.65;
+            
+            const frame = new THREE.Mesh(new THREE.BoxGeometry(depth, height, width), woodMat);
+            frame.position.set(0, height / 2, 0);
+            frame.castShadow = true;
+            frame.receiveShadow = true;
+            group.add(frame);
+            
+            // Dark trim on top
+            const trimMat = new THREE.MeshStandardMaterial({ color: 0x3d2b1f, roughness: 0.4 });
+            const trim = new THREE.Mesh(new THREE.BoxGeometry(depth + 0.05, 0.035, width + 0.05), trimMat);
+            trim.position.set(0, height + 0.017, 0);
+            group.add(trim);
+            
+            const shelfCount = 3;
+            for (let i = 0; i < shelfCount; i++) {
+                const shelfY = 0.12 + i * (height - 0.2) / shelfCount;
+                addColorfulBooks(group, shelfY, width - 0.15, depth / 2 - 0.08, depth / 4 + 0.01);
+                addColorfulBooks(group, shelfY, width - 0.15, depth / 2 - 0.08, -depth / 4 - 0.01, true);
+            }
+            
+            return group;
+        }
+        
+        function addColorfulBooks(parent, shelfY, shelfWidth, shelfDepth, offsetX = 0, flip = false) {
+            // Rich, saturated book colors - NOT white
+            const bookColors = [
+                0x991b1b, 0xb45309, 0xa16207, 0x166534, 0x1e40af,
+                0x6b21a8, 0xbe185d, 0x1e3a8a, 0x14532d, 0x9a3412,
+                0x581c87, 0x0f766e, 0x854d0e, 0xb91c1c, 0x047857,
+                0x1e3a5f, 0x4c1d95, 0x7f1d1d, 0x064e3b, 0x312e81,
+                0x713f12, 0x0d9488, 0x92400e, 0x4338ca, 0x065f46
+            ];
+            
+            let zPos = -shelfWidth / 2 + 0.02;
+            
+            while (zPos < shelfWidth / 2 - 0.06) {
+                const bookWidth = 0.018 + Math.random() * 0.032;
+                const bookHeight = 0.14 + Math.random() * 0.11;
+                const bookDepth = shelfDepth * (0.75 + Math.random() * 0.25);
+                
+                const bookColor = bookColors[Math.floor(Math.random() * bookColors.length)];
+                const bookMat = new THREE.MeshStandardMaterial({ color: bookColor, roughness: 0.75 });
+                
+                const book = new THREE.Mesh(new THREE.BoxGeometry(bookDepth, bookHeight, bookWidth), bookMat);
+                const tilt = (Math.random() - 0.5) * 0.06;
+                book.rotation.z = tilt;
+                book.position.set(offsetX + (flip ? -bookDepth/2 : bookDepth/2), shelfY + bookHeight / 2, zPos + bookWidth / 2);
+                book.castShadow = true;
+                book.receiveShadow = true;
+                parent.add(book);
+                
+                // Gold/silver spine lettering
+                if (bookHeight > 0.17 && Math.random() > 0.35) {
+                    const textColor = Math.random() > 0.6 ? 0xd4af37 : 0xb8b8b8;
+                    const textMat = new THREE.MeshStandardMaterial({ color: textColor, roughness: 0.35, metalness: 0.4 });
+                    const text = new THREE.Mesh(new THREE.BoxGeometry(bookDepth + 0.001, 0.007, bookWidth * 0.55), textMat);
+                    text.position.copy(book.position);
+                    text.position.y = shelfY + bookHeight * 0.65;
+                    text.rotation.z = tilt;
+                    parent.add(text);
+                }
+                
+                // Cream-colored pages
+                const pagesMat = new THREE.MeshStandardMaterial({ color: 0xf5eed6, roughness: 0.95 });
+                const pages = new THREE.Mesh(new THREE.BoxGeometry(bookDepth - 0.005, bookHeight - 0.008, 0.003), pagesMat);
+                pages.position.set(offsetX + (flip ? -bookDepth/2 : bookDepth/2), shelfY + bookHeight / 2, zPos + bookWidth / 2 + bookWidth / 2 + 0.0015);
+                pages.rotation.z = tilt;
+                parent.add(pages);
+                
+                zPos += bookWidth + 0.002 + Math.random() * 0.006;
+                if (Math.random() > 0.9) zPos += 0.018;
+            }
+        }
+        
+        function createFurniture() {
+            // Light maple tables
+            const tableMat = new THREE.MeshStandardMaterial({ color: 0xc9a66b, roughness: 0.5 });
+            const legMat = new THREE.MeshStandardMaterial({ color: 0x5c5c5c, roughness: 0.3, metalness: 0.5 });
+            
+            createTable(0, 0, 4, tableMat, legMat);
+            createTable(-5, 0, 4, tableMat, legMat);
+            
+            const chairPositions = [
+                [0, 0, 3.2, 0], [0, 0, 4.8, Math.PI],
+                [-0.7, 0, 4, Math.PI/2], [0.7, 0, 4, -Math.PI/2],
+                [-5, 0, 3.2, 0], [-5, 0, 4.8, Math.PI],
+                [-5.7, 0, 4, Math.PI/2], [-4.3, 0, 4, -Math.PI/2]
+            ];
+            chairPositions.forEach(([x, y, z, rot]) => createChair(x, y, z, rot));
+            
+            // Colorful bean bags
+            createBeanBag(4, 0, 3, 0xdc2626);
+            createBeanBag(5.5, 0, 3.3, 0x2563eb);
+            createBeanBag(6, 0, 4.5, 0x16a34a);
+            createBeanBag(4.5, 0, 5, 0xea580c);
+        }
+        
+        function createTable(x, y, z, tableMat, legMat) {
+            const top = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.05, 1.1), tableMat);
+            top.position.set(x, 0.72, z);
+            top.castShadow = true;
+            top.receiveShadow = true;
+            scene.add(top);
+            
+            // Dark edge band
+            const edgeMat = new THREE.MeshStandardMaterial({ color: 0x8b6914, roughness: 0.4 });
+            const edgeFront = new THREE.Mesh(new THREE.BoxGeometry(1.62, 0.035, 0.025), edgeMat);
+            edgeFront.position.set(x, 0.73, z + 0.545);
+            scene.add(edgeFront);
+            const edgeBack = edgeFront.clone();
+            edgeBack.position.z = z - 0.545;
+            scene.add(edgeBack);
+            
+            // Chrome legs
+            const legGeo = new THREE.CylinderGeometry(0.025, 0.025, 0.7, 12);
+            [[-0.65, 0.35, -0.42], [0.65, 0.35, -0.42], [-0.65, 0.35, 0.42], [0.65, 0.35, 0.42]].forEach(pos => {
+                const leg = new THREE.Mesh(legGeo, legMat);
+                leg.position.set(x + pos[0], pos[1], z + pos[2]);
+                leg.castShadow = true;
+                scene.add(leg);
+            });
+        }
+        
+        function createChair(x, y, z, rotation) {
+            const group = new THREE.Group();
+            
+            // Blue plastic seat
+            const seatMat = new THREE.MeshStandardMaterial({ color: 0x1d4ed8, roughness: 0.5 });
+            const seat = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.045, 0.38), seatMat);
+            seat.position.y = 0.44;
+            seat.castShadow = true;
+            group.add(seat);
+            
+            const back = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.32, 0.035), seatMat);
+            back.position.set(0, 0.63, -0.17);
+            back.castShadow = true;
+            group.add(back);
+            
+            // Chrome legs
+            const legMat = new THREE.MeshStandardMaterial({ color: 0x8a8a8a, roughness: 0.2, metalness: 0.6 });
+            const legGeo = new THREE.CylinderGeometry(0.012, 0.012, 0.42, 8);
+            [[-0.14, 0.21, -0.14], [0.14, 0.21, -0.14], [-0.14, 0.21, 0.14], [0.14, 0.21, 0.14]].forEach(pos => {
+                const leg = new THREE.Mesh(legGeo, legMat);
+                leg.position.set(...pos);
+                group.add(leg);
+            });
+            
+            group.position.set(x, y, z);
+            group.rotation.y = rotation;
+            scene.add(group);
+        }
+        
+        function createBeanBag(x, y, z, color) {
+            const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.85 });
+            const bag = new THREE.Mesh(new THREE.SphereGeometry(0.4, 24, 18), mat);
+            bag.scale.set(1, 0.5, 1);
+            bag.position.set(x, 0.22, z);
+            bag.castShadow = true;
+            bag.receiveShadow = true;
+            scene.add(bag);
+        }
+        
+        function createCheckoutDesk() {
+            // Laminate desk - warm tan
+            const deskMat = new THREE.MeshStandardMaterial({ color: 0xb8a07a, roughness: 0.4 });
+            const desk = new THREE.Mesh(new THREE.BoxGeometry(2.8, 1.0, 0.75), deskMat);
+            desk.position.set(7, 0.5, 6);
+            desk.castShadow = true;
+            desk.receiveShadow = true;
+            scene.add(desk);
+            
+            // Dark brown trim
+            const trimMat = new THREE.MeshStandardMaterial({ color: 0x4a3728, roughness: 0.5 });
+            const trim = new THREE.Mesh(new THREE.BoxGeometry(2.82, 0.045, 0.77), trimMat);
+            trim.position.set(7, 1.02, 6);
+            scene.add(trim);
+            
+            // Monitor - dark gray
+            const monitorMat = new THREE.MeshStandardMaterial({ color: 0x2d2d2d, roughness: 0.3 });
+            const monitor = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.35, 0.03), monitorMat);
+            monitor.position.set(7, 1.35, 5.75);
+            monitor.castShadow = true;
+            scene.add(monitor);
+            
+            const stand = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.2, 0.08), monitorMat);
+            stand.position.set(7, 1.15, 5.75);
+            scene.add(stand);
+            
+            // Screen glow
+            const screenMat = new THREE.MeshBasicMaterial({ color: 0x93c5fd });
+            const screen = new THREE.Mesh(new THREE.PlaneGeometry(0.44, 0.3), screenMat);
+            screen.position.set(7, 1.35, 5.735);
+            scene.add(screen);
+            
+            // Green checkout sign
+            const signMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.4 });
+            const sign = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.35, 0.04), signMat);
+            sign.position.set(7, 2.2, 5.65);
+            scene.add(sign);
+            
+            // Keyboard
+            const kbMat = new THREE.MeshStandardMaterial({ color: 0x3f3f3f, roughness: 0.5 });
+            const keyboard = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.02, 0.15), kbMat);
+            keyboard.position.set(7, 1.03, 6.2);
+            scene.add(keyboard);
+        }
+        
+        function createDecorations() {
+            // Globe with wooden stand
+            const globeGroup = new THREE.Group();
+            
+            const standMat = new THREE.MeshStandardMaterial({ color: 0x7a5c3e, roughness: 0.5 });
+            const base = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.04, 16), standMat);
+            globeGroup.add(base);
+            const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.28, 8), standMat);
+            stem.position.y = 0.16;
+            globeGroup.add(stem);
+            
+            // Blue/green globe
+            const globeMat = new THREE.MeshStandardMaterial({ color: 0x3b82a0, roughness: 0.6 });
+            const globe = new THREE.Mesh(new THREE.SphereGeometry(0.18, 32, 32), globeMat);
+            globe.position.y = 0.38;
+            globeGroup.add(globe);
+            
+            // Brass ring
+            const ringMat = new THREE.MeshStandardMaterial({ color: 0xb8860b, roughness: 0.3, metalness: 0.5 });
+            const ring = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.012, 8, 32), ringMat);
+            ring.position.y = 0.38;
+            ring.rotation.x = Math.PI / 6;
+            globeGroup.add(ring);
+            
+            globeGroup.position.set(-7, 0.72, 6);
+            scene.add(globeGroup);
+            
+            // Terracotta potted plant
+            const potMat = new THREE.MeshStandardMaterial({ color: 0xb5532c, roughness: 0.7 });
+            const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.1, 0.24, 16), potMat);
+            pot.position.set(8.5, 0.12, 2);
+            pot.castShadow = true;
+            scene.add(pot);
+            
+            // Soil
+            const soilMat = new THREE.MeshStandardMaterial({ color: 0x3d2914, roughness: 1 });
+            const soil = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.03, 16), soilMat);
+            soil.position.set(8.5, 0.235, 2);
+            scene.add(soil);
+            
+            // Green plant leaves
+            const leafMat = new THREE.MeshStandardMaterial({ color: 0x228b22, roughness: 0.8, side: THREE.DoubleSide });
+            for (let i = 0; i < 8; i++) {
+                const leaf = new THREE.Mesh(new THREE.PlaneGeometry(0.1, 0.38), leafMat);
+                const angle = (i / 8) * Math.PI * 2;
+                leaf.position.set(8.5 + Math.cos(angle) * 0.06, 0.48, 2 + Math.sin(angle) * 0.06);
+                leaf.rotation.y = angle;
+                leaf.rotation.x = -0.35 - Math.random() * 0.2;
+                scene.add(leaf);
+            }
+            
+            // Gray metal book cart
+            const cartMat = new THREE.MeshStandardMaterial({ color: 0x5a5a5a, roughness: 0.4, metalness: 0.3 });
+            const cartShelf1 = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.025, 0.4), cartMat);
+            cartShelf1.position.set(3, 0.8, -5);
+            cartShelf1.castShadow = true;
+            scene.add(cartShelf1);
+            const cartShelf2 = cartShelf1.clone();
+            cartShelf2.position.y = 0.5;
+            scene.add(cartShelf2);
+            
+            // Cart legs
+            const cartLegGeo = new THREE.CylinderGeometry(0.015, 0.015, 0.8, 8);
+            [[-0.25, 0.4, -0.15], [0.25, 0.4, -0.15], [-0.25, 0.4, 0.15], [0.25, 0.4, 0.15]].forEach(pos => {
+                const leg = new THREE.Mesh(cartLegGeo, cartMat);
+                leg.position.set(3 + pos[0], pos[1], -5 + pos[2]);
+                scene.add(leg);
+            });
+            
+            // Books on cart
+            const cartBookColors = [0x991b1b, 0x1e40af, 0x166534, 0x7e22ce];
+            cartBookColors.forEach((color, i) => {
+                const book = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.18, 0.035, 0.25),
+                    new THREE.MeshStandardMaterial({ color, roughness: 0.7 })
+                );
+                book.position.set(3 - 0.12 + (i % 2) * 0.24, 0.84 + Math.floor(i / 2) * 0.04, -5 + (i % 2) * 0.05);
+                book.rotation.y = (Math.random() - 0.5) * 0.2;
+                book.castShadow = true;
+                scene.add(book);
+            });
+        }
+        
+        function createLighting() {
+            // Warm ambient
+            const ambient = new THREE.AmbientLight(0xfff0e0, 0.4);
+            scene.add(ambient);
+            
+            // Hemisphere (warm sky, cool ground)
+            const hemi = new THREE.HemisphereLight(0xfff5eb, 0xb8a890, 0.35);
+            scene.add(hemi);
+            
+            // Fluorescent ceiling fixtures
+            const lightPositions = [
+                [-5, 3.4, -4], [0, 3.4, -4], [5, 3.4, -4],
+                [-5, 3.4, 2], [0, 3.4, 2], [5, 3.4, 2]
+            ];
+            
+            lightPositions.forEach(([x, y, z]) => {
+                // Light housing - off-white
+                const housingMat = new THREE.MeshStandardMaterial({ color: 0xddd8cc, roughness: 0.5 });
+                const housing = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.08, 0.4), housingMat);
+                housing.position.set(x, y, z);
+                scene.add(housing);
+                
+                // Light diffuser panel
+                const panelMat = new THREE.MeshStandardMaterial({ 
+                    color: 0xfff8f0, roughness: 0.15,
+                    emissive: 0xfff5e6, emissiveIntensity: 0.35
+                });
+                const panel = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 0.35), panelMat);
+                panel.position.set(x, y - 0.041, z);
+                panel.rotation.x = -Math.PI / 2;
+                scene.add(panel);
+                
+                // Point light
+                const light = new THREE.PointLight(0xfff5e6, 0.45, 7);
+                light.position.set(x, y - 0.2, z);
+                light.castShadow = true;
+                light.shadow.mapSize.width = 512;
+                light.shadow.mapSize.height = 512;
+                light.shadow.radius = 3;
+                scene.add(light);
+            });
+            
+            // Window daylight
+            const windowLight = new THREE.DirectionalLight(0xfff8e1, 0.65);
+            windowLight.position.set(-18, 10, 0);
+            windowLight.castShadow = true;
+            windowLight.shadow.mapSize.width = 1024;
+            windowLight.shadow.mapSize.height = 1024;
+            windowLight.shadow.camera.near = 1;
+            windowLight.shadow.camera.far = 30;
+            windowLight.shadow.camera.left = -14;
+            windowLight.shadow.camera.right = 14;
+            windowLight.shadow.camera.top = 10;
+            windowLight.shadow.camera.bottom = -5;
+            windowLight.shadow.bias = -0.0001;
+            scene.add(windowLight);
+        }
+        
+        function createHotspots() {
+            recommendations.forEach((rec, i) => {
+                const pos = rec.shelf_location.position_3d;
+                
+                const glowMat = new THREE.MeshBasicMaterial({
+                    color: getColor(rec.score), transparent: true, opacity: 0.18
+                });
+                const glow = new THREE.Mesh(new THREE.SphereGeometry(0.22, 24, 24), glowMat);
+                glow.position.set(pos.x, pos.y, pos.z);
+                scene.add(glow);
+                
+                const coreMat = new THREE.MeshBasicMaterial({
+                    color: getColor(rec.score), transparent: true, opacity: 0.9
+                });
+                const hotspot = new THREE.Mesh(new THREE.SphereGeometry(0.07, 16, 16), coreMat);
+                hotspot.position.set(pos.x, pos.y, pos.z);
+                hotspot.userData = { recommendation: rec, index: i, glow };
+                
+                const ringMat = new THREE.MeshBasicMaterial({
+                    color: getColor(rec.score), transparent: true, opacity: 0.5, side: THREE.DoubleSide
+                });
+                const ring = new THREE.Mesh(new THREE.RingGeometry(0.1, 0.13, 24), ringMat);
+                ring.rotation.x = -Math.PI / 2;
+                hotspot.add(ring);
+                hotspot.userData.ring = ring;
+                
+                hotspots.push(hotspot);
+                scene.add(hotspot);
+                
+                const label = document.createElement('div');
+                label.className = 'hotspot-label';
+                label.textContent = rec.title;
+                label.id = `label-${i}`;
+                document.getElementById('hotspotLabels').appendChild(label);
+            });
+        }
+        
+        function getColor(score) {
+            if (score >= 0.9) return 0x10b981;
+            if (score >= 0.85) return 0x6366f1;
+            return 0xf59e0b;
+        }
+        
+        function populateCards() {
+            const container = document.getElementById('bookCards');
+            container.innerHTML = '';
+
+            if (recommendations.length === 0) {
+                container.innerHTML = `<div class="empty-state">Chat with the librarian or scan a book cover to get personalized recommendations</div>`;
+                return;
+            }
+
+            recommendations.forEach((rec, i) => {
+                const card = document.createElement('div');
+                card.className = 'book-card';
+                card.onclick = () => navigateToBook(rec, i);
+                card.onmouseenter = () => highlightHotspot(i);
+                card.onmouseleave = () => unhighlightHotspot(i);
+                const initials = rec.title.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
+                const coverHtml = rec.cover_url
+                    ? `<img src="${rec.cover_url}" alt="${rec.title}" onerror="this.parentElement.innerHTML='${initials}'">`
+                    : initials;
+                card.innerHTML = `
+                    <div class="match-score">${Math.round(rec.score * 100)}%</div>
+                    <div class="book-card-cover">${coverHtml}</div>
+                    <div class="book-genre">${rec.genre}</div>
+                    <div class="book-title">${rec.title}</div>
+                    <div class="book-author">by ${rec.author}</div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function navigateToBook(rec, index) {
+            const pos = rec.shelf_location.position_3d;
+            if (pos) {
+                let standX, standZ, angleToBook;
+
+                // Determine shelf orientation and position user accordingly
+                if (pos.z < -5) {
+                    // Back wall shelf - stand in front, face toward -z (the wall)
+                    standX = pos.x;
+                    standZ = pos.z + 2;
+                    angleToBook = 0;  // Face -z direction
+                } else if (pos.x < -7) {
+                    // Left wall shelf - stand to the right, face toward -x (the wall)
+                    standX = pos.x + 2;
+                    standZ = pos.z;
+                    angleToBook = Math.PI / 2;  // Face -x direction
+                } else {
+                    // Center island or other - stand in front, face the shelf
+                    standX = pos.x;
+                    standZ = pos.z + 1.5;
+                    angleToBook = 0;  // Face -z direction
+                }
+
+                walkTarget = new THREE.Vector3(standX, 1.6, standZ);
+                isWalking = true;
+
+                // Set camera to face the book after arriving
+                setTimeout(() => {
+                    targetTheta = angleToBook;
+                }, 800);
+
+                // Highlight the hotspot
+                highlightHotspot(index);
+
+                // Show modal after arriving
+                setTimeout(() => showModal(rec), 1500);
+            } else {
+                showModal(rec);
+            }
+        }
+
+        function navigateToScanResult(idx) {
+            if (window.lastScanResults && window.lastScanResults[idx]) {
+                const book = window.lastScanResults[idx];
+                // Close the visual search panel
+                toggleVisualPanel();
+                // Find the book in recommendations and navigate
+                const recIndex = recommendations.findIndex(r => r.title === book.title);
+                if (recIndex >= 0) {
+                    navigateToBook(recommendations[recIndex], recIndex);
+                } else {
+                    navigateToBook(book, idx);
+                }
+            }
+        }
+
+        function updateRecommendations(newBooks) {
+            // Replace recommendations with new list (don't merge - user may have excluded books)
+            recommendations = newBooks.slice(0, 10);
+            // Refresh UI
+            refreshHotspots();
+            populateCards();
+        }
+        
+        function showModal(rec) {
+            currentModalBook = rec;
+            document.getElementById('modalGenre').textContent = rec.genre;
+            document.getElementById('modalTitle').textContent = rec.title;
+            document.getElementById('modalAuthor').textContent = `by ${rec.author}`;
+            // Show description if available, otherwise fall back to pitch
+            const pitchText = rec.description || rec.pitch || `A great ${rec.genre.toLowerCase()} book!`;
+            document.getElementById('modalPitch').textContent = pitchText;
+            document.getElementById('modalLocation').textContent = `Section ${rec.shelf_location.section}, Shelf ${rec.shelf_location.shelf}`;
+
+            // Handle cover image
+            const coverContainer = document.getElementById('modalCover');
+            const initials = rec.title.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
+
+            if (rec.cover_url) {
+                // Show cover image
+                coverContainer.innerHTML = `<img src="${rec.cover_url}" alt="${rec.title}" onerror="this.parentElement.innerHTML='<div class=\\'modal-cover-placeholder\\'>${initials}</div>'">`;
+            } else {
+                // Show placeholder with initials
+                coverContainer.innerHTML = `<div class="modal-cover-placeholder">${initials}</div>`;
+            }
+
+            document.getElementById('bookModal').classList.add('visible');
+
+            // Update button text if already in list
+            const btn = document.querySelector('#bookModal .btn-primary');
+            const inList = readingList.some(b => b.title === rec.title);
+            btn.textContent = inList ? '✓ In My List' : 'Add to My List';
+            btn.disabled = inList;
+        }
+
+        function closeModal() { document.getElementById('bookModal').classList.remove('visible'); }
+
+        function addToList() {
+            if (currentModalBook && !readingList.some(b => b.title === currentModalBook.title)) {
+                readingList.push(currentModalBook);
+                updateReadingListButton();
+            }
+            closeModal();
+        }
+
+        function updateReadingListButton() {
+            const btn = document.getElementById('readingListBtn');
+            const count = readingList.length;
+            btn.textContent = `📚 My List (${count})`;
+            btn.style.display = count > 0 ? 'block' : 'none';
+        }
+
+        function toggleReadingList() {
+            const panel = document.getElementById('readingListPanel');
+            panel.classList.toggle('visible');
+            if (panel.classList.contains('visible')) {
+                renderReadingList();
+            }
+        }
+
+        function renderReadingList() {
+            const container = document.getElementById('readingListBooks');
+            if (readingList.length === 0) {
+                container.innerHTML = '<p style="color:#6b7280;text-align:center;padding:20px;">No books added yet</p>';
+                return;
+            }
+            container.innerHTML = readingList.map((book, idx) => `
+                <div class="reading-list-item" onclick="navigateFromReadingList(${idx})">
+                    <div class="reading-list-title">${escapeHtml(book.title)}</div>
+                    <div class="reading-list-author">by ${escapeHtml(book.author)}</div>
+                    <button class="reading-list-remove" onclick="event.stopPropagation(); removeFromList(${idx})">✕</button>
+                </div>
+            `).join('');
+        }
+
+        function navigateFromReadingList(idx) {
+            const book = readingList[idx];
+            document.getElementById('readingListPanel').classList.remove('visible');
+            const recIndex = recommendations.findIndex(r => r.title === book.title);
+            if (recIndex >= 0) {
+                navigateToBook(recommendations[recIndex], recIndex);
+            } else {
+                navigateToBook(book, idx);
+            }
+        }
+
+        function removeFromList(idx) {
+            readingList.splice(idx, 1);
+            updateReadingListButton();
+            renderReadingList();
+        }
+        
+        function highlightHotspot(i) {
+            if (hotspots[i]) {
+                hotspots[i].scale.set(1.4, 1.4, 1.4);
+                hotspots[i].userData.glow.scale.set(1.4, 1.4, 1.4);
+                hotspots[i].userData.glow.material.opacity = 0.3;
+                document.getElementById(`label-${i}`)?.classList.add('visible');
+            }
+            document.querySelectorAll('.book-card')[i]?.classList.add('highlighted');
+        }
+        
+        function unhighlightHotspot(i) {
+            if (hotspots[i]) {
+                hotspots[i].scale.set(1, 1, 1);
+                hotspots[i].userData.glow.scale.set(1, 1, 1);
+                hotspots[i].userData.glow.material.opacity = 0.18;
+                document.getElementById(`label-${i}`)?.classList.remove('visible');
+            }
+            document.querySelectorAll('.book-card')[i]?.classList.remove('highlighted');
+        }
+        
+        // ===== GOOGLE MAPS STYLE CONTROLS =====
+        function onMouseDown(e) {
+            if (e.button === 0) {
+                clickStartTime = Date.now();
+                clickStartPos = { x: e.clientX, y: e.clientY };
+                isDragging = true;
+                dragStart = { x: e.clientX, y: e.clientY };
+                renderer.domElement.classList.remove('cursor-grab');
+                renderer.domElement.classList.add('cursor-grabbing');
+            }
+        }
+        
+        function onMouseMove(e) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+            
+            if (isDragging) {
+                const dx = e.clientX - dragStart.x;
+                const dy = e.clientY - dragStart.y;
+                targetTheta += dx * 0.005;
+                targetPhi += dy * 0.005;
+                targetPhi = Math.max(Math.PI / 3, Math.min(Math.PI / 1.8, targetPhi));  // Keep near eye level
+                dragStart = { x: e.clientX, y: e.clientY };
+            } else {
+                raycaster.setFromCamera(mouse, camera);
+                const hits = raycaster.intersectObjects(hotspots);
+                hotspots.forEach((h, i) => unhighlightHotspot(i));
+                if (hits.length > 0) {
+                    highlightHotspot(hits[0].object.userData.index);
+                    renderer.domElement.classList.remove('cursor-grab');
+                    renderer.domElement.classList.add('cursor-pointer');
+                } else {
+                    renderer.domElement.classList.remove('cursor-pointer');
+                    renderer.domElement.classList.add('cursor-grab');
+                }
+            }
+        }
+        
+        function onMouseUp(e) {
+            if (!isDragging) return;
+            isDragging = false;
+            renderer.domElement.classList.remove('cursor-grabbing');
+            renderer.domElement.classList.add('cursor-grab');
+            
+            const clickDuration = Date.now() - clickStartTime;
+            const clickDistance = Math.hypot(e.clientX - clickStartPos.x, e.clientY - clickStartPos.y);
+            if (clickDuration < 250 && clickDistance < 10) handleClick(e);
+        }
+        
+        function handleClick(e) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            
+            const hotspotHits = raycaster.intersectObjects(hotspots);
+            if (hotspotHits.length > 0) {
+                showModal(hotspotHits[0].object.userData.recommendation);
+                return;
+            }
+            
+            const floorHits = raycaster.intersectObject(floorMesh);
+            if (floorHits.length > 0) {
+                const point = floorHits[0].point;
+                const newX = Math.max(roomBounds.minX, Math.min(roomBounds.maxX, point.x));
+                const newZ = Math.max(roomBounds.minZ, Math.min(roomBounds.maxZ, point.z));
+                walkTarget = new THREE.Vector3(newX, 1.6, newZ);  // Eye level
+                isWalking = true;
+                showNavMarker(e.clientX, e.clientY);
+            }
+        }
+        
+        function showNavMarker(x, y) {
+            const marker = document.createElement('div');
+            marker.className = 'nav-marker';
+            marker.innerHTML = '<div class="nav-marker-ring"></div><div class="nav-marker-dot"></div>';
+            marker.style.left = x + 'px';
+            marker.style.top = y + 'px';
+            document.body.appendChild(marker);
+            setTimeout(() => marker.remove(), 600);
+        }
+        
+        function onWheel(e) {
+            e.preventDefault();
+            targetDistance += e.deltaY * 0.01;
+            targetDistance = Math.max(3, Math.min(15, targetDistance));
+        }
+        
+        let touchStartDist = 0, lastTouchPos = null;
+        
+        function onTouchStart(e) {
+            e.preventDefault();
+            if (e.touches.length === 1) {
+                clickStartTime = Date.now();
+                clickStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                isDragging = true;
+                dragStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                lastTouchPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            } else if (e.touches.length === 2) {
+                touchStartDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+            }
+        }
+        
+        function onTouchMove(e) {
+            e.preventDefault();
+            if (e.touches.length === 1 && isDragging) {
+                const dx = e.touches[0].clientX - dragStart.x;
+                const dy = e.touches[0].clientY - dragStart.y;
+                targetTheta += dx * 0.005;
+                targetPhi += dy * 0.005;
+                targetPhi = Math.max(Math.PI / 3, Math.min(Math.PI / 1.8, targetPhi));  // Keep near eye level
+                dragStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                lastTouchPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            } else if (e.touches.length === 2) {
+                const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+                targetDistance += (touchStartDist - dist) * 0.02;
+                targetDistance = Math.max(3, Math.min(15, targetDistance));
+                touchStartDist = dist;
+            }
+        }
+        
+        function onTouchEnd(e) {
+            if (isDragging && e.touches.length === 0) {
+                isDragging = false;
+                const clickDuration = Date.now() - clickStartTime;
+                const clickDistance = Math.hypot(lastTouchPos.x - clickStartPos.x, lastTouchPos.y - clickStartPos.y);
+                if (clickDuration < 250 && clickDistance < 20) {
+                    handleClick({ clientX: lastTouchPos.x, clientY: lastTouchPos.y });
+                }
+            }
+        }
+        
+        function onResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        
+        function updateLabels() {
+            hotspots.forEach((h, i) => {
+                const label = document.getElementById(`label-${i}`);
+                if (!label) return;
+                const pos = h.position.clone();
+                pos.y += 0.35;
+                pos.project(camera);
+                if (pos.z > 1 || pos.z < 0) {
+                    label.style.display = 'none';
+                } else {
+                    label.style.display = 'block';
+                    label.style.left = `${(pos.x * 0.5 + 0.5) * window.innerWidth}px`;
+                    label.style.top = `${(-pos.y * 0.5 + 0.5) * window.innerHeight}px`;
+                }
+            });
+        }
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            const t = Date.now() * 0.001;
+            
+            cameraTheta += (targetTheta - cameraTheta) * 0.1;
+            cameraPhi += (targetPhi - cameraPhi) * 0.1;
+            cameraDistance += (targetDistance - cameraDistance) * 0.1;
+            
+            if (isWalking && walkTarget) {
+                const dx = walkTarget.x - cameraTarget.x;
+                const dz = walkTarget.z - cameraTarget.z;
+                const dist = Math.sqrt(dx * dx + dz * dz);
+                if (dist > 0.05) {
+                    // Smooth lerp - move 8% of remaining distance each frame
+                    cameraTarget.x += dx * 0.08;
+                    cameraTarget.z += dz * 0.08;
+                } else {
+                    // Snap to target when close enough
+                    cameraTarget.x = walkTarget.x;
+                    cameraTarget.z = walkTarget.z;
+                    isWalking = false;
+                    walkTarget = null;
+                }
+            }
+            
+            updateCameraPosition();
+            
+            hotspots.forEach((h, i) => {
+                const pulse = 1 + Math.sin(t * 2.5 + i) * 0.08;
+                h.userData.ring.scale.set(pulse, pulse, 1);
+                h.userData.ring.material.opacity = 0.4 + Math.sin(t * 3 + i) * 0.15;
+                h.position.y = h.userData.recommendation.shelf_location.position_3d.y + Math.sin(t * 1.5 + i * 0.7) * 0.015;
+                h.userData.glow.position.y = h.position.y;
+            });
+            
+            updateLabels();
+            renderer.render(scene, camera);
+        }
+        
+        init();
+
+        // ===== CHAT PANEL =====
+        function toggleChatPanel() {
+            document.getElementById('chatPanel').classList.toggle('open');
+            document.getElementById('visualPanel').classList.remove('open');
+        }
+
+        function toggleVisualPanel() {
+            document.getElementById('visualPanel').classList.toggle('open');
+            document.getElementById('chatPanel').classList.remove('open');
+        }
+
+        function handleChatKeypress(e) {
+            if (e.key === 'Enter') sendChatMessage();
+        }
+
+        async function sendChatMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            if (!message) return;
+
+            // Auto-select grade 5 if no grade selected
+            if (!currentStudentId) {
+                document.getElementById('gradeSelect').value = '5';
+                await selectGrade('5');
+            }
+
+            const messagesDiv = document.getElementById('chatMessages');
+            const sendBtn = document.getElementById('chatSendBtn');
+
+            // Add user message
+            messagesDiv.innerHTML += `<div class="chat-bubble chat-user">${escapeHtml(message)}</div>`;
+            input.value = '';
+            sendBtn.disabled = true;
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+            // Add status indicator
+            const statusId = 'status-' + Date.now();
+            messagesDiv.innerHTML += `<div class="chat-bubble chat-assistant" id="${statusId}"><span class="tool-status">Thinking...</span></div>`;
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'text/event-stream'
+                    },
+                    body: JSON.stringify({ student_id: currentStudentId, message })
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                const statusEl = document.getElementById(statusId);
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop(); // Keep incomplete line in buffer
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                if (data.type === 'tool') {
+                                    statusEl.innerHTML = `<span class="tool-status">${data.name}...</span>`;
+                                } else if (data.type === 'response') {
+                                    statusEl.innerHTML = renderMarkdown(data.text);
+                                } else if (data.type === 'recommendations' && data.books) {
+                                    // Update recommendations panel
+                                    updateRecommendations(data.books);
+                                }
+                                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                            } catch (e) {}
+                        }
+                    }
+                }
+            } catch (error) {
+                document.getElementById(statusId).innerHTML = 'Sorry, I had trouble responding. Please try again.';
+            }
+
+            sendBtn.disabled = false;
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function renderMarkdown(text) {
+            // Simple markdown rendering for chat responses
+            return text
+                .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')  // **bold**
+                .replace(/\*(.+?)\*/g, '<em>$1</em>')              // *italic*
+                .replace(/`(.+?)`/g, '<code>$1</code>')            // `code`
+                .replace(/\n\n/g, '</p><p>')                       // Double newlines = paragraphs
+                .replace(/\n/g, '<br>')                            // Single newlines = line breaks
+                .replace(/^/, '<p>').replace(/$/, '</p>');         // Wrap in paragraphs
+        }
+
+        // ===== VISUAL SEARCH =====
+        const uploadZone = document.getElementById('uploadZone');
+
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        });
+
+        uploadZone.addEventListener('dragleave', () => {
+            uploadZone.classList.remove('dragover');
+        });
+
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) {
+                processImage(file);
+            }
+        });
+
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (file) processImage(file);
+        }
+
+        async function processImage(file) {
+            const preview = document.getElementById('uploadPreview');
+            const analysisDiv = document.getElementById('analysisResult');
+            const similarDiv = document.getElementById('similarBooksList');
+
+            // Show preview
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const base64 = e.target.result;
+                preview.innerHTML = `<img src="${base64}" alt="Book cover">`;
+                analysisDiv.innerHTML = '';
+                similarDiv.innerHTML = '';
+
+                // Use selected grade or default to grade 5 (middle school)
+                const studentId = currentStudentId || 'grade-5';
+                if (!currentStudentId) {
+                    // Auto-select grade 5 if none selected
+                    document.getElementById('gradeSelect').value = '5';
+                    selectGrade('5');
+                }
+
+                try {
+                    const response = await fetch('/api/visual-search', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ student_id: studentId, image: base64 })
+                    });
+                    const data = await response.json();
+
+                    if (!response.ok || data.error) {
+                        throw new Error(data.error || 'Failed to analyze image');
+                    }
+
+                    // Show analysis (lowercase all tags)
+                    analysisDiv.innerHTML = `
+                        <div class="analysis-result">
+                            <div class="analysis-title">${escapeHtml(data.analysis.title)}</div>
+                            <div class="analysis-author">by ${escapeHtml(data.analysis.author)}</div>
+                            <div class="analysis-tags">
+                                ${data.analysis.genres.map(g => `<span class="analysis-tag">${escapeHtml(g.toLowerCase())}</span>`).join('')}
+                                ${data.analysis.themes.slice(0,3).map(t => `<span class="analysis-tag">${escapeHtml(t.toLowerCase())}</span>`).join('')}
+                            </div>
+                        </div>
+                    `;
+
+                    // Show similar books and add to recommendations
+                    if (data.similar_books && data.similar_books.length > 0) {
+                        similarDiv.innerHTML = '<h4 style="margin-bottom:12px;color:#111827;">Similar Books</h4><p style="font-size:12px;color:#6b7280;margin-bottom:12px;">Click a book to visit its location</p>' +
+                            data.similar_books.map((book, idx) => `
+                                <div class="similar-book-item" onclick="navigateToScanResult(${idx})">
+                                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                                        <div>
+                                            <div class="similar-book-title">${escapeHtml(book.title)}</div>
+                                            <div class="similar-book-author">by ${escapeHtml(book.author)}</div>
+                                        </div>
+                                        <span style="color:#10b981;font-size:18px;">→</span>
+                                    </div>
+                                </div>
+                            `).join('');
+
+                        // Add to recommendations panel with positions
+                        const positions = [
+                            {x: -6, y: 1.4, z: -7}, {x: -2, y: 1.2, z: -7},
+                            {x: 2, y: 1.6, z: -7}, {x: 6, y: 1.0, z: -7}, {x: -8, y: 1.3, z: 0},
+                            {x: -8, y: 1.5, z: -3}, {x: 8, y: 1.2, z: -3},
+                            {x: -4, y: 1.4, z: -7}, {x: 4, y: 1.3, z: -7}, {x: 0, y: 1.5, z: -7}
+                        ];
+                        const formattedBooks = data.similar_books.slice(0, 10).map((book, i) => {
+                            // Create a short pitch from description (1-2 sentences)
+                            let pitch = book.description || '';
+                            if (pitch.length > 150) {
+                                // Truncate at sentence boundary
+                                const sentences = pitch.match(/[^.!?]+[.!?]+/g) || [pitch];
+                                pitch = sentences.slice(0, 2).join(' ').trim();
+                                if (pitch.length > 180) pitch = pitch.substring(0, 180) + '...';
+                            }
+                            if (!pitch) pitch = `A great ${book.genre || 'book'} pick for you!`;
+
+                            // Use similarity_score from visual search, fallback to 0.8
+                            const score = book.similarity_score ?? book.score ?? 0.8;
+
+                            return {
+                                id: Date.now() + i,
+                                title: book.title,
+                                author: book.author,
+                                genre: book.genre || 'Book',
+                                score: score,
+                                cover_url: book.cover_url || '',
+                                description: book.description || '',
+                                shelf_location: {
+                                    section: String.fromCharCode(65 + i),
+                                    row: i + 1,
+                                    shelf: i + 1,
+                                    position_3d: positions[i]
+                                },
+                                pitch: pitch
+                            };
+                        });
+                        // Store for navigation
+                        window.lastScanResults = formattedBooks;
+                        updateRecommendations(formattedBooks);
+                    }
+                } catch (error) {
+                    analysisDiv.innerHTML = '<p style="color:#dc2626;">Failed to analyze image. Please try again.</p>';
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+    </script>
+</body>
+</html>

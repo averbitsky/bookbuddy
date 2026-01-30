@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300" viewBox="0 0 200 300">
+  <rect width="200" height="300" fill="#f39c12"/>
+  <text x="100" y="120" font-family="Georgia, serif" font-size="48" fill="white" text-anchor="middle">MF</text>
+  <text x="100" y="180" font-family="Arial, sans-serif" font-size="12" fill="white" text-anchor="middle" opacity="0.9">
+    <tspan x="100" dy="0">Mrs. Frisby and the Rats </tspan>
+    <tspan x="100" dy="18">...</tspan>
+  </text>
+  <text x="100" y="260" font-family="Arial, sans-serif" font-size="10" fill="white" text-anchor="middle" opacity="0.7">Robert C. O'Brien</text>
+</svg>
