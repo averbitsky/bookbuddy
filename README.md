@@ -68,6 +68,10 @@ uv venv
 source .venv/bin/activate  # or `.venv\Scripts\activate` on Windows
 uv pip install -e .
 
+# Generate book catalog (creates data/book_catalog.json)
+# Embeddings are generated automatically on first server start
+python bookbuddy/data_generator.py
+
 # Run the 3D virtual library
 python server.py
 # Open http://localhost:5001
