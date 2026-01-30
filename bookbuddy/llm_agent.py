@@ -5,11 +5,11 @@ LLM chat with tool calling. Uses OpenAI GPT-5-mini with function calling for per
 import json
 import os
 import re
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 import numpy as np
-from openai import OpenAI
 from loguru import logger
+from openai import OpenAI
 
 from bookbuddy.recommendation_engine import get_engine
 
@@ -190,7 +190,7 @@ You can only: recommend books, answer book questions, give shelf locations."""
         # Normalize must_contain keyword
         must_contain_lower = must_contain.lower().strip() if must_contain else ""
 
-        # Get student's reading level for filtering
+        # Get the student's reading level for filtering
         reading_level = None
         acceptable_levels = None
         if student_id and student_id in self.engine.students:
@@ -336,9 +336,9 @@ You can only: recommend books, answer book questions, give shelf locations."""
         tool_calls = []
         choice = response.choices[0]
 
-        # If the model wants to call tools, execute them and get final response
+        # If the model wants to call tools, execute them and get the final response
         if choice.message.tool_calls:
-            # Add assistant message with tool calls
+            # Add the assistant message with tool calls
             messages.append(choice.message)
 
             for tc in choice.message.tool_calls:
@@ -350,7 +350,7 @@ You can only: recommend books, answer book questions, give shelf locations."""
                     {"name": tc.function.name, "input": args, "result": result}
                 )
 
-                # Add tool result to messages
+                # Add the tool result to messages
                 messages.append(
                     {
                         "role": "tool",
@@ -359,7 +359,7 @@ You can only: recommend books, answer book questions, give shelf locations."""
                     }
                 )
 
-            # Get final response with tool results
+            # Get the final response with tool results
             final_response_obj = self.client.chat.completions.create(
                 model="gpt-5-mini", messages=messages
             )

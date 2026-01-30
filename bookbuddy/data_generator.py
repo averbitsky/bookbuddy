@@ -3,19 +3,21 @@ Synthetic Data Generator. Generates book catalog data.
 """
 
 import json
+import os
 import random
 import re
 import uuid
-from typing import List, Dict, Any
-import os
+from typing import Any, Dict, List
+
 from loguru import logger
 
 
 def sanitize_filename(title: str) -> str:
-    """Convert title to a safe filename (must match download_covers.py)."""
+    """Convert the title to a safe filename (must match download_covers.py)."""
     filename = re.sub(r"[^\w\s-]", "", title.lower())
     filename = re.sub(r"\s+", "_", filename)
     return filename[:50]
+
 
 random.seed(42)
 

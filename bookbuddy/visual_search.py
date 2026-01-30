@@ -8,21 +8,15 @@ import io
 import json
 import os
 import pickle
-import numpy as np
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Literal
+from typing import Any, Dict, Literal, Optional
 
+import moondream as md
+import numpy as np
+from PIL import Image
+from loguru import logger
 from openai import OpenAI
 from sentence_transformers import SentenceTransformer
-from loguru import logger
-
-# Moondream is optional - only import if needed
-try:
-    import moondream as md
-    from PIL import Image
-    MOONDREAM_AVAILABLE = True
-except ImportError:
-    MOONDREAM_AVAILABLE = False
 
 
 class VisualSearch:
@@ -31,7 +25,11 @@ class VisualSearch:
     Embeddings are pre-computed and cached in data/book_embeddings.pkl.
     """
 
-    def __init__(self, data_dir: str = "data", vision_provider: Literal["openai", "moondream"] = "openai"):
+    def __init__(
+        self,
+        data_dir: str = "data",
+        vision_provider: Literal["openai", "moondream"] = "openai",
+    ):
         """Initialize with the selected vision provider and embedding model."""
         self.vision_provider = vision_provider
         self.data_dir = Path(data_dir)
@@ -42,8 +40,6 @@ class VisualSearch:
 
         # Initialize the appropriate vision client
         if vision_provider == "moondream":
-            if not MOONDREAM_AVAILABLE:
-                raise ImportError("Moondream not installed. Run: pip install moondream pillow")
             api_key = os.environ.get("MOONDREAM_API_KEY")
             if not api_key:
                 raise ValueError("MOONDREAM_API_KEY not set in environment")

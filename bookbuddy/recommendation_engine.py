@@ -3,9 +3,10 @@ Book recommendation engine with content-based similarity for finding similar boo
 """
 
 import json
-import numpy as np
-from typing import List, Dict, Any
 import os
+from typing import Any, Dict, List
+
+import numpy as np
 from loguru import logger
 
 
