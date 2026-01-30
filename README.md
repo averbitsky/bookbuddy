@@ -2,6 +2,8 @@
 
 A multi-modal recommendation system designed to increase student reading engagement through personalized AI recommendations, visual book discovery, and interactive 3D library exploration.
 
+![BookBuddy Demo](static/bookbuddy_demo.png)
+
 ## Problem
 
 School librarians rely on anecdotal data to recommend books. Students discover books through browsing shelves and seeing covers, not flat recommendation lists.
@@ -38,7 +40,7 @@ School librarians rely on anecdotal data to recommend books. Students discover b
 │   ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                 │
 │   │   Content    │  │   Visual     │  │   Semantic   │                 │
 │   │  Similarity  │  │   Search     │  │   Search     │                 │
-│   │              │  │ (GPT Vision) │  │ (Embeddings) │                 │
+│   │              │  │              │  │ (Embeddings) │                 │
 │   └──────────────┘  └──────────────┘  └──────────────┘                 │
 ├─────────────────────────────────────────────────────────────────────────┤
 │   DATA LAYER                                                            │
@@ -54,7 +56,7 @@ School librarians rely on anecdotal data to recommend books. Students discover b
 |-----------|-------------|
 | **LLM Chat** | GPT-5-mini with tool calling. Supports query expansion with synonyms, exclusions ("not Harry Potter"), and required keywords ("must have dragons"). |
 | **Semantic Search** | Sentence Transformers (all-mpnet-base-v2) embeddings. Filters by reading level, then ranks by similarity. Supports length queries ("short books under 200 pages"). |
-| **Visual Search** | GPT-5-mini vision analyzes book covers to extract title, author, and themes. Finds similar books using embeddings. |
+| **Visual Search** | Moondream vision (default) or GPT-5-mini analyzes book covers to extract title, author, and themes. Finds similar books using embeddings. |
 | **Grade Filtering** | Books filtered to appropriate reading levels (K-2, 3-5, 6-8, 9-12) including adjacent levels. |
 | **3D Library** | Three.js interactive library with recommendation hotspots and draggable camera. |
 | **Book Catalog** | 100 children's books with custom descriptions, page counts, shelf locations, and availability. |
@@ -74,10 +76,12 @@ python server.py
 
 ## Configuration
 
-Copy `.env.example` to `.env` and add your API key:
+Copy `.env.example` to `.env` and add your API keys:
 
 ```bash
 OPENAI_API_KEY="your-key"
+MOONDREAM_API_KEY="your-key"  # Get from https://moondream.ai
+VISION_PROVIDER="moondream"   # or "openai"
 ```
 
 ## Project Structure
@@ -86,13 +90,14 @@ OPENAI_API_KEY="your-key"
 bookbuddy/
 ├── server.py                   # Flask server for 3D library
 ├── pyproject.toml              # Project dependencies
-├── download_covers.py          # Utility to download book covers from Open Library
 ├── bookbuddy/
 │   ├── __init__.py             # Package exports
 │   ├── recommendation_engine.py # Content-based similarity
 │   ├── llm_agent.py            # LLM with tool calling
-│   ├── visual_search.py        # Book cover analysis (GPT-5-mini vision) + semantic search
-│   └── data_generator.py       # Synthetic data generation
+│   ├── visual_search.py        # Book cover analysis (Moondream/OpenAI) + semantic search
+│   └── data_generator.py       # Book catalog with custom descriptions
+├── scripts/
+│   └── download_covers.py      # Utility to download book covers from Open Library
 ├── data/
 │   ├── book_catalog.json       # Generated book catalog (100 books)
 │   └── book_embeddings.pkl     # Cached semantic embeddings

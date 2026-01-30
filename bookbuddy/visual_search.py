@@ -1,35 +1,57 @@
 """
-Visual book search using OpenAI Vision and Sentence Transformers. Enables students to take photos of book covers and
-find similar books. Pre-computes and caches book embeddings for fast similarity search.
+Visual book search using OpenAI Vision or Moondream and Sentence Transformers. Enables students to take photos of
+book covers and find similar books. Pre-computes and caches book embeddings for fast similarity search.
 """
 
 import base64
+import io
 import json
 import os
 import pickle
 import numpy as np
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Literal
 
 from openai import OpenAI
 from sentence_transformers import SentenceTransformer
 from loguru import logger
 
+# Moondream is optional - only import if needed
+try:
+    import moondream as md
+    from PIL import Image
+    MOONDREAM_AVAILABLE = True
+except ImportError:
+    MOONDREAM_AVAILABLE = False
+
 
 class VisualSearch:
     """
-    Visual book search using OpenAI's vision capabilities and semantic embeddings. Embeddings are pre-computed and
-    cached in data/book_embeddings.pkl.
+    Visual book search using OpenAI's or Moondream's vision capabilities and semantic embeddings.
+    Embeddings are pre-computed and cached in data/book_embeddings.pkl.
     """
 
-    def __init__(self, data_dir: str = "data"):
-        """Initialize with an OpenAI client and embedding model."""
-        self.client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+    def __init__(self, data_dir: str = "data", vision_provider: Literal["openai", "moondream"] = "openai"):
+        """Initialize with the selected vision provider and embedding model."""
+        self.vision_provider = vision_provider
         self.data_dir = Path(data_dir)
         self.embedding_model = SentenceTransformer("all-mpnet-base-v2")
         self._book_embeddings = None
         self._book_ids = None
         self._embeddings_path = self.data_dir / "book_embeddings.pkl"
+
+        # Initialize the appropriate vision client
+        if vision_provider == "moondream":
+            if not MOONDREAM_AVAILABLE:
+                raise ImportError("Moondream not installed. Run: pip install moondream pillow")
+            api_key = os.environ.get("MOONDREAM_API_KEY")
+            if not api_key:
+                raise ValueError("MOONDREAM_API_KEY not set in environment")
+            self.moondream_model = md.vl(api_key=api_key)
+            logger.info("Using Moondream for vision analysis")
+        else:
+            self.client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+            logger.info("Using OpenAI for vision analysis")
 
     def _encode_image(self, image_source) -> str:
         """Encode image to base64."""
@@ -107,11 +129,63 @@ class VisualSearch:
 
     def analyze_book_cover(self, image_source) -> Dict[str, Any]:
         """
-        Analyze a book cover image to extract metadata.
+        Analyze a book cover image to extract metadata using the configured vision provider.
         """
         if not image_source:
             return self._fallback_result()
 
+        if self.vision_provider == "moondream":
+            return self._analyze_with_moondream(image_source)
+        else:
+            return self._analyze_with_openai(image_source)
+
+    def _analyze_with_moondream(self, image_source) -> Dict[str, Any]:
+        """Analyze book cover using Moondream vision model."""
+        try:
+            # Convert image source to PIL Image
+            if isinstance(image_source, str):
+                image = Image.open(image_source)
+            elif isinstance(image_source, bytes):
+                image = Image.open(io.BytesIO(image_source))
+            else:
+                raise ValueError("Unsupported image source type")
+
+            prompt = 'Read the book cover. Return JSON only: {"title": "...", "author": "...", "genres": ["..."], "themes": ["..."]}'
+            result = self.moondream_model.query(image, prompt)
+            content = result.get("answer", "")
+
+            if not content:
+                return self._fallback_result()
+
+            # Parse JSON from response
+            content = content.strip()
+            if "```" in content:
+                parts = content.split("```")
+                for part in parts:
+                    part = part.strip()
+                    if part.startswith("json"):
+                        part = part[4:].strip()
+                    if part.startswith("{"):
+                        content = part
+                        break
+
+            data = json.loads(content)
+
+            return {
+                "title": data.get("title", "Unknown"),
+                "author": data.get("author", "Unknown"),
+                "genre_hints": data.get("genres", []),
+                "themes": data.get("themes", []),
+                "visual_style": data.get("visual_description", ""),
+                "confidence": 0.90,
+            }
+
+        except Exception as e:
+            logger.exception(f"Moondream API error: {type(e).__name__}: {e}")
+            return self._fallback_result()
+
+    def _analyze_with_openai(self, image_source) -> Dict[str, Any]:
+        """Analyze book cover using OpenAI GPT-5-mini vision."""
         try:
             image_base64 = self._encode_image(image_source)
 
@@ -174,7 +248,7 @@ class VisualSearch:
             }
 
         except Exception as e:
-            logger.exception(f"Vision API error: {type(e).__name__}: {e}")
+            logger.exception(f"OpenAI Vision API error: {type(e).__name__}: {e}")
             return self._fallback_result()
 
     def _fallback_result(self) -> Dict[str, Any]:
@@ -207,7 +281,7 @@ class VisualSearch:
         book_info: Dict[str, Any],
         recommendation_engine,
         student_id: Optional[str] = None,
-        n: int = 5,
+        n: int = 10,
     ) -> Dict[str, Any]:
         """Find similar books using semantic embeddings, filtered by reading level."""
 

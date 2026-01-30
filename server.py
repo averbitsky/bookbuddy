@@ -5,6 +5,7 @@ Serves the 3D virtual library with dynamic recommendations.
 
 import base64
 import json as json_module
+import os
 from flask import Flask, jsonify, send_file, request, Response
 from pathlib import Path
 
@@ -27,7 +28,11 @@ if not (data_dir / "book_catalog.json").exists():
     generate_all_data(str(data_dir))
 
 engine = BookRecommendationEngine(str(data_dir))
-visual_search = VisualSearch()
+
+# Vision provider: "openai" or "moondream" (set via VISION_PROVIDER env var)
+vision_provider = os.environ.get("VISION_PROVIDER", "openai")
+visual_search = VisualSearch(vision_provider=vision_provider)
+
 agent = BookBuddyAgent(engine, visual_search, use_openai=True)
 
 
