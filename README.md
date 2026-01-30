@@ -38,8 +38,8 @@ School librarians rely on anecdotal data to recommend books. Students discover b
 ├───────────────────────────────────────────────────────────────────────┤
 │  TOOL LAYER                                                           │
 │  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐     │
-│  │     Content      │  │     Visual       │  │    Semantic      │     │
-│  │   Similarity     │  │     Search       │  │     Search       │     │
+│  │      Content     │  │      Visual      │  │     Semantic     │     │
+│  │    Similarity    │  │      Search      │  │      Search      │     │
 │  └──────────────────┘  └──────────────────┘  └──────────────────┘     │
 ├───────────────────────────────────────────────────────────────────────┤
 │  DATA LAYER                                                           │
